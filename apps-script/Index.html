@@ -17,11 +17,12 @@
     .seg input { display:none; }
     .seg label { text-align:center; padding:13px 10px; border:1px solid var(--line); border-radius:12px; font-weight:700; background:#fafafa; }
     .seg input:checked + label { background:#171717; color:#fff; border-color:#171717; }
-    input[type="file"], input[type="date"], input[type="number"], input[type="text"] { width:100%; border:1px solid var(--line); border-radius:12px; padding:13px 12px; background:#fff; font-size:16px; }
+    input[type="file"], input[type="date"], input[type="number"], input[type="text"] { width:100%; min-width:0; max-width:100%; display:block; -webkit-appearance:none; appearance:none; min-height:48px; border:1px solid var(--line); border-radius:12px; padding:13px 12px; background:#fff; font-size:16px; }
     button { width:100%; border:0; border-radius:14px; padding:15px 14px; font-size:16px; font-weight:800; background:#171717; color:#fff; cursor:pointer; }
     button.secondary { background:#e5e5e5; color:#171717; }
     button:disabled { opacity:.45; cursor:default; }
-    .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .grid { display:grid; grid-template-columns:1fr; gap:0; }
+    .grid > * { min-width:0; }
     .field { margin:12px 0; }
     .status { font-size:14px; line-height:1.55; margin-top:12px; color:#525252; }
     .warn { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:10px 12px; border-radius:12px; font-size:13px; margin-top:10px; }
@@ -134,13 +135,27 @@
 
 <script>
   let current = null;
+  let hideTimer = null;
+
+  function clearResult() {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    current = null;
+    document.getElementById('date').value = '';
+    document.getElementById('amount').value = '';
+    document.getElementById('description').value = '';
+    document.getElementById('target').textContent = '';
+    document.getElementById('warning').classList.add('hidden');
+    document.getElementById('saveStatus').textContent = '';
+    document.getElementById('saveBtn').disabled = false;
+    document.getElementById('resultCard').classList.add('hidden');
+  }
 
   function analyze(form) {
     const btn = document.getElementById('readBtn');
     const status = document.getElementById('readStatus');
     btn.disabled = true;
     status.textContent = '読み取り中…';
-    document.getElementById('resultCard').classList.add('hidden');
+    clearResult();
 
     google.script.run
       .withSuccessHandler(data => {
@@ -161,7 +176,7 @@
         document.getElementById('resultCard').classList.remove('hidden');
         status.textContent = '読み取り完了。内容だけ確認してください。';
         btn.disabled = false;
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        setTimeout(() => document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
       })
       .withFailureHandler(err => {
         status.textContent = 'エラー：' + (err && err.message ? err.message : err);
@@ -194,10 +209,11 @@
         document.getElementById('payerY').checked = true;
         current = null;
         monthsLoaded = false;
-        setTimeout(() => {
-          document.getElementById('resultCard').classList.add('hidden');
+        hideTimer = setTimeout(() => {
+          hideTimer = null;
+          clearResult();
           document.getElementById('readStatus').textContent = '';
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          document.getElementById('receiptForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 1500);
       })
       .withFailureHandler(err => {
