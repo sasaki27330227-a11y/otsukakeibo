@@ -5,35 +5,35 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <style>
-    :root { color-scheme: light; --bg:#F3ECDC; --card:#FBF7EE; --ink:#1E3A8A; --navy:#1E3A8A; --red:#D7263D; --yellow:#F2B705; --muted:#6B6F8A; --line:#1E3A8A; }
+    :root { color-scheme: light; --bg:#F2EFE8; --card:#FAF8F3; --ink:#232A3D; --navy:#232A3D; --red:#9A4A3A; --yellow:#E3D9C2; --muted:#7A7F8C; --line:#232A3D; }
     * { box-sizing:border-box; }
     body { margin:0; font-family:"Helvetica Neue",Helvetica,Arial,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif; background:var(--bg); color:#1f2340;
-      background-image:radial-gradient(rgba(30,58,138,.06) 1px, transparent 1px); background-size:14px 14px; }
+      background-image:radial-gradient(rgba(35,42,61,.05) 1px, transparent 1px); background-size:14px 14px; }
     main { max-width:520px; margin:0 auto; padding:18px 16px 60px; }
     h1 { font-size:22px; margin:2px 0 2px; color:var(--navy); letter-spacing:.14em; text-transform:uppercase; font-weight:900; }
-    .sub { margin:0 0 16px; color:var(--red); font-size:11px; letter-spacing:.22em; text-transform:uppercase; font-weight:800; }
-    .card { background:var(--card); border:2px solid var(--navy); border-radius:6px; padding:16px; margin:14px 0; box-shadow:6px 6px 0 var(--navy); }
+    .sub { margin:0 0 16px; color:var(--muted); font-size:11px; letter-spacing:.22em; text-transform:uppercase; font-weight:800; }
+    .card { background:var(--card); border:2px solid var(--navy); border-radius:6px; padding:16px; margin:14px 0; box-shadow:3px 3px 0 var(--navy); }
     .label { display:block; font-size:11px; font-weight:900; margin-bottom:8px; color:var(--navy); letter-spacing:.18em; text-transform:uppercase; }
     .seg { display:grid; grid-template-columns:1fr 1fr; gap:0; border:2px solid var(--navy); border-radius:999px; overflow:hidden; }
     .seg input { display:none; }
     .seg label { text-align:center; padding:12px 10px; font-weight:900; background:var(--card); color:var(--navy); letter-spacing:.1em; }
     .seg label + input + label { border-left:2px solid var(--navy); }
-    .seg input:checked + label { background:var(--navy); color:#F3ECDC; }
+    .seg input:checked + label { background:var(--navy); color:#F2EFE8; }
     input[type="file"], input[type="date"], input[type="number"], input[type="text"] { width:100%; min-width:0; max-width:100%; display:block; -webkit-appearance:none; appearance:none; min-height:48px; border:2px solid var(--navy); border-radius:6px; padding:12px; background:#fff; font-size:16px; color:#1f2340; }
-    input:focus { outline:none; box-shadow:0 0 0 3px var(--yellow); }
-    button { width:100%; border:2px solid var(--navy); border-radius:999px; padding:14px; font-size:15px; font-weight:900; letter-spacing:.12em; background:var(--navy); color:#F3ECDC; cursor:pointer; }
+    input:focus { outline:none; box-shadow:0 0 0 3px var(--yellow); border-color:var(--navy); }
+    button { width:100%; border:2px solid var(--navy); border-radius:999px; padding:14px; font-size:15px; font-weight:900; letter-spacing:.12em; background:var(--navy); color:#F2EFE8; cursor:pointer; }
     button.secondary { background:var(--card); color:var(--navy); }
     button:disabled { opacity:.45; cursor:default; }
     .grid { display:grid; grid-template-columns:1fr; gap:0; }
     .grid > * { min-width:0; }
     .field { margin:12px 0; }
     .status { font-size:13px; line-height:1.55; margin-top:12px; color:var(--muted); }
-    .warn { background:#FFF3C4; border:2px solid var(--yellow); color:#7A5A00; padding:10px 12px; border-radius:6px; font-size:13px; margin-top:10px; }
-    .ok { background:var(--navy); color:#F3ECDC; padding:12px; border-radius:6px; font-size:14px; margin-top:10px; font-weight:800; }
+    .warn { background:#F1EAD8; border:2px solid var(--yellow); color:#6A5A3A; padding:10px 12px; border-radius:6px; font-size:13px; margin-top:10px; }
+    .ok { background:var(--navy); color:#F2EFE8; padding:12px; border-radius:6px; font-size:14px; margin-top:10px; font-weight:800; }
     .tiny { font-size:12px; color:var(--muted); margin-top:8px; }
     .tabs { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:6px; }
-    .tabs button { background:var(--card); color:var(--navy); padding:12px; border-radius:6px; box-shadow:4px 4px 0 var(--navy); }
-    .tabs button.active { background:var(--red); border-color:var(--red); color:#F3ECDC; box-shadow:4px 4px 0 var(--navy); }
+    .tabs button { background:var(--card); color:var(--navy); padding:12px; border-radius:6px; box-shadow:3px 3px 0 var(--navy); }
+    .tabs button.active { background:var(--navy); color:#F2EFE8; }
     select { width:100%; border:2px solid var(--navy); border-radius:6px; padding:12px; background:#fff; font-size:16px; color:var(--navy); font-weight:800; }
     .kpi { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
     .kpi div { background:#fff; border:2px solid var(--navy); border-radius:6px; padding:12px; }
@@ -43,12 +43,12 @@
     .kpi .big { grid-column:1 / -1; background:var(--yellow); }
     .kpi .big .v { font-size:36px; }
     table { width:100%; border-collapse:collapse; font-size:14px; margin-top:8px; }
-    td { padding:9px 4px; border-bottom:1px dashed rgba(30,58,138,.35); vertical-align:top; }
+    td { padding:9px 4px; border-bottom:1px dashed rgba(35,42,61,.3); vertical-align:top; }
     td.r { text-align:right; white-space:nowrap; font-family:Georgia,serif; font-weight:700; color:var(--navy); }
     .tag { display:inline-block; font-size:10px; padding:2px 8px; border-radius:999px; border:1.5px solid var(--navy); color:var(--navy); margin-right:6px; font-weight:900; letter-spacing:.08em; }
-    .tag.s { background:var(--navy); color:#F3ECDC; }
-    .tag.y { background:var(--red); border-color:var(--red); color:#F3ECDC; }
-    .stripes { height:10px; background:linear-gradient(to bottom, var(--red) 0 34%, var(--navy) 34% 67%, var(--yellow) 67%); margin:0 -16px 14px; }
+    .tag.s { background:var(--navy); color:#F2EFE8; }
+    .tag.y { background:var(--red); border-color:var(--red); color:#F2EFE8; }
+    .stripes { height:2px; background:var(--navy); margin:0 0 16px; }
     .hidden { display:none; }
   </style>
 </head>
