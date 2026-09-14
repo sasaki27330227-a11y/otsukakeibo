@@ -684,3 +684,11 @@ function deleteEntry(data) {
   SpreadsheetApp.flush();
   return { ok: true, message: '削除しました。' };
 }
+
+
+/** 読み取りをやめる：保存済みのレシート画像を削除 */
+function cancelReceipt(fileId) {
+  if (!fileId) return { ok: true };
+  try { DriveApp.getFileById(String(fileId)).setTrashed(true); } catch (e) { console.warn(e); }
+  return { ok: true };
+}

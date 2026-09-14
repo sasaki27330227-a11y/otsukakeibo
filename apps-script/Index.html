@@ -137,6 +137,7 @@
       <pre id="ocrText" style="white-space:pre-wrap;font-size:12px;color:#525252;background:#fafafa;border:1px solid var(--line);border-radius:10px;padding:10px;max-height:220px;overflow:auto"></pre>
     </details>
     <button id="saveBtn" type="button" onclick="save()">家計簿に登録</button>
+    <button type="button" class="secondary" style="margin-top:8px" onclick="cancelEntry()">やめる</button>
     <div id="saveStatus" class="status"></div>
   </section>
   </div>
@@ -158,6 +159,16 @@
     document.getElementById('ocrBox').classList.add('hidden');
     document.getElementById('saveBtn').disabled = false;
     document.getElementById('resultCard').classList.add('hidden');
+  }
+
+  function cancelEntry() {
+    const fileId = current && current.receiptFileId;
+    clearResult();
+    document.getElementById('receiptForm').reset();
+    document.getElementById('payerY').checked = true;
+    document.getElementById('readStatus').textContent = '';
+    if (fileId) google.script.run.cancelReceipt(fileId);
+    document.getElementById('receiptForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function manualEntry() {
