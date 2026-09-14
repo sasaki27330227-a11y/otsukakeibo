@@ -4,11 +4,11 @@
     <rect width="512" height="512" fill="#F2EFE8"/>
     <rect x="36" y="36" width="440" height="440" fill="none" stroke="#232A3D" stroke-width="4"/>
     <rect x="48" y="48" width="416" height="416" fill="none" stroke="#232A3D" stroke-width="1.5"/>
-    <text x="256" y="120" text-anchor="middle" font-family="TeX Gyre Adventor, Poppins, sans-serif" font-weight="700" font-size="46" letter-spacing="8" fill="#232A3D">KAKEIBO</text>
+    <text x="256" y="120" text-anchor="middle" font-family="TeX Gyre Adventor, Poppins, sans-serif" font-weight="700" font-size="44" letter-spacing="2" fill="#232A3D">TsukeTsuke</text>
     <line x1="96" y1="146" x2="416" y2="146" stroke="#232A3D" stroke-width="2"/>
     <text x="256" y="372" text-anchor="middle" font-family="TeX Gyre Bonum, DejaVu Serif, serif" font-weight="700" font-size="250" fill="#232A3D">¥</text>
     <circle cx="396" cy="222" r="22" fill="#9A4A3A"/>
     <line x1="96" y1="404" x2="416" y2="404" stroke="#232A3D" stroke-width="2"/>
-    <text x="256" y="438" text-anchor="middle" font-family="TeX Gyre Adventor, Poppins, sans-serif" font-weight="700" font-size="15" letter-spacing="4" fill="#9A4A3A">RECEIPT &amp; SAVINGS</text>
+    <text x="256" y="438" text-anchor="middle" font-family="TeX Gyre Adventor, Poppins, sans-serif" font-weight="700" font-size="15" letter-spacing="4" fill="#9A4A3A">OTSU FAMILY KAKEIBO</text>
   </g>
 </svg>

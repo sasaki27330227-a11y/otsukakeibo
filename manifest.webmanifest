@@ -1,6 +1,6 @@
 {
-  "name": "家計簿レシート登録",
-  "short_name": "家計簿",
+  "name": "TsukeTsuke 大津家家計簿",
+  "short_name": "TsukeTsuke",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#F2EFE8",
