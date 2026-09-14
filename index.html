@@ -120,6 +120,7 @@
 
 <script>
   const KEY = 'receiptKakeiboGasUrl';
+  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyJQWcYmwG0wKCPN_ij5Onjf0DH222nyz4mEXaOpHPisOidKjIYbAMKrHhpOQU2Ojci/exec';
   const setup = document.getElementById('setup');
   const frame = document.getElementById('gasFrame');
   const urlInput = document.getElementById('gasUrl');
@@ -167,7 +168,7 @@
     if (current) openApp(current);
   });
 
-  const saved = localStorage.getItem(KEY);
+  const saved = localStorage.getItem(KEY) || DEFAULT_GAS_URL;
   if (saved && isValidGasUrl(saved)) {
     openApp(saved);
   } else {
