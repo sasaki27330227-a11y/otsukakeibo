@@ -152,7 +152,16 @@ function getMonthSheetName_(dateString) {
   }
   const yy = Utilities.formatDate(date, RECEIPT_APP.TZ, 'yy');
   const month = Number(Utilities.formatDate(date, RECEIPT_APP.TZ, 'M'));
-  return yy + month; // 2026/9 => 269, 2026/10 => 2610
+  const fallback = yy + month; // 2026/9 => 269, 2026/10 => 2610
+
+  // 実在するタブ名（26/9, 26-9 など表記ゆれ）に合わせる
+  try {
+    const key = Number(yy) * 100 + month;
+    const hit = getHouseholdSpreadsheet_().getSheets()
+      .map(s => s.getName()).find(n => monthKey_(n) === key);
+    if (hit) return hit;
+  } catch (e) {}
+  return fallback;
 }
 
 function findTotalRow_(sheet) {
@@ -387,17 +396,26 @@ function extractStoreName_(lines) {
 /** 月タブ一覧（新しい順）と、初期表示する月を返す */
 function listMonthSheets() {
   const ss = getHouseholdSpreadsheet_();
-  const names = ss.getSheets()
-    .map(s => s.getName())
-    .filter(n => /^\d{3,4}$/.test(n))
-    .sort((a, b) => monthKey_(b) - monthKey_(a));
+  const all = ss.getSheets().map(s => s.getName());
+  const names = all.filter(n => monthKey_(n) > 0).sort((a, b) => monthKey_(b) - monthKey_(a));
+  if (!names.length) {
+    throw new Error('月タブが見つかりません。タブ名: ' + all.join(', '));
+  }
   const today = getMonthSheetName_(new Date());
   return { sheets: names, current: names.indexOf(today) >= 0 ? today : names[0] };
 }
 
+/**
+ * タブ名 → 年月キー（例: 269 / 26/9 / 26-9 / 2026年9月 / ２６９ → 2609）
+ * 月タブでなければ 0。
+ */
 function monthKey_(name) {
-  const m = String(name).match(/^(\d{2})(\d{1,2})$/);
-  return m ? Number(m[1]) * 100 + Number(m[2]) : 0;
+  let n = String(name).normalize('NFKC').trim();
+  let m = n.match(/^(20)?(\d{2})\s*[\/\.\-_年]?\s*(\d{1,2})\s*月?$/);
+  if (!m) return 0;
+  const yy = Number(m[2]), mo = Number(m[3]);
+  if (mo < 1 || mo > 12) return 0;
+  return yy * 100 + mo;
 }
 
 /** 指定月タブのサマリーを返す */
