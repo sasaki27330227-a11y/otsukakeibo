@@ -379,3 +379,113 @@ function extractStoreName_(lines) {
   }
   return '';
 }
+
+/* =========================================================
+ * 閲覧機能（月サマリー・登録一覧・余り金残高）
+ * ========================================================= */
+
+/** 月タブ一覧（新しい順）と、初期表示する月を返す */
+function listMonthSheets() {
+  const ss = getHouseholdSpreadsheet_();
+  const names = ss.getSheets()
+    .map(s => s.getName())
+    .filter(n => /^\d{3,4}$/.test(n))
+    .sort((a, b) => monthKey_(b) - monthKey_(a));
+  const today = getMonthSheetName_(new Date());
+  return { sheets: names, current: names.indexOf(today) >= 0 ? today : names[0] };
+}
+
+function monthKey_(name) {
+  const m = String(name).match(/^(\d{2})(\d{1,2})$/);
+  return m ? Number(m[1]) * 100 + Number(m[2]) : 0;
+}
+
+/** 指定月タブのサマリーを返す */
+function getMonthSummary(sheetName) {
+  const ss = getHouseholdSpreadsheet_();
+  const sheet = ss.getSheetByName(String(sheetName));
+  if (!sheet) throw new Error('月タブ「' + sheetName + '」が見つかりません。');
+
+  const totalRow = findTotalRow_(sheet);
+  const lastRow = Math.max(sheet.getLastRow(), totalRow + 3);
+  const values = sheet.getRange(1, 1, lastRow, 10).getValues();
+  const displays = sheet.getRange(1, 1, lastRow, 10).getDisplayValues();
+
+  // 左側（A/B列）：予算・固定費・余り・翔平受け取り
+  const budget = toNum_(values[1][1]); // B2
+  const fixed = [];
+  let leftover = null, shoheiReceive = null;
+  for (let r = 2; r < values.length; r++) {
+    const label = String(values[r][0] || '').trim();
+    const v = values[r][1];
+    if (!label) continue;
+    if (label === '余り' || label === '余り1') { if (leftover === null) leftover = toNum_(v); continue; }
+    if (label === '翔平受け取り') { shoheiReceive = toNum_(v); continue; }
+    if (r <= 9 && v !== '') fixed.push({ label: label, amount: toNum_(v) });
+  }
+  if (shoheiReceive === null && leftover !== null) shoheiReceive = budget - leftover;
+
+  // 合計・差額
+  const yumikoTotal = toNum_(values[totalRow - 1][4]); // E
+  const shoheiTotal = toNum_(values[totalRow - 1][8]); // I
+  let diff = null;
+  for (let r = 0; r < values.length; r++) {
+    if (String(values[r][6]).trim() === '差額') { diff = toNum_(values[r][8]); break; }
+  }
+  if (diff === null) diff = shoheiTotal - yumikoTotal;
+
+  // 明細
+  const entries = [];
+  const pushEntry = (payer, dCol, aCol, tCol) => {
+    for (let r = 1; r < totalRow - 1; r++) {
+      const amt = values[r][aCol];
+      if (amt === '' || amt === null) continue;
+      entries.push({
+        payer: payer,
+        date: displays[r][dCol] || '',
+        sortKey: values[r][dCol] instanceof Date ? values[r][dCol].getTime() : 0,
+        amount: toNum_(amt),
+        description: String(values[r][tCol] || '')
+      });
+    }
+  };
+  pushEntry('ゆみこ', 3, 4, 5);
+  pushEntry('翔平', 7, 8, 9);
+  entries.sort((a, b) => b.sortKey - a.sortKey);
+
+  return {
+    sheetName: String(sheetName),
+    budget: budget,
+    fixed: fixed,
+    leftover: leftover,          // 貯金に回せる額（余り）
+    shoheiReceive: shoheiReceive,
+    yumikoTotal: yumikoTotal,
+    shoheiTotal: shoheiTotal,
+    diff: diff,                  // +なら翔平が多く払っている
+    entries: entries,
+    savings: getSavingsBalance_(ss)
+  };
+}
+
+/** 「余り金」タブの累計残金（最新月）を返す */
+function getSavingsBalance_(ss) {
+  const sheet = ss.getSheetByName('余り金');
+  if (!sheet) return null;
+  const last = sheet.getLastRow();
+  // M〜P列：M=年, N=月, O=その月の余り, P=累計残金
+  const vals = sheet.getRange(1, 13, last, 4).getValues();
+  let year = '', result = null;
+  for (let r = 0; r < vals.length; r++) {
+    if (vals[r][0] !== '' && vals[r][0] !== null) year = String(vals[r][0]).replace(/\.0$/, '');
+    if (vals[r][1] !== '' && vals[r][2] !== '' && vals[r][2] !== null) {
+      result = { year: year, month: String(vals[r][1]), balance: toNum_(vals[r][3]) };
+    }
+  }
+  return result;
+}
+
+function toNum_(v) {
+  if (v === '' || v === null || v === undefined) return 0;
+  const n = Number(String(v).replace(/,/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}

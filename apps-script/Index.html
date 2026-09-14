@@ -26,15 +26,66 @@
     .status { font-size:14px; line-height:1.55; margin-top:12px; color:#525252; }
     .warn { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:10px 12px; border-radius:12px; font-size:13px; margin-top:10px; }
     .ok { background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; padding:12px; border-radius:12px; font-size:14px; margin-top:10px; }
+    .tabs { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+    .tabs button { background:#e5e5e5; color:#171717; padding:12px; }
+    .tabs button.active { background:#171717; color:#fff; }
+    select { width:100%; border:1px solid var(--line); border-radius:12px; padding:12px; background:#fff; font-size:16px; }
+    .kpi { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+    .kpi div { background:#fafafa; border:1px solid var(--line); border-radius:12px; padding:12px; }
+    .kpi .k { font-size:12px; color:var(--muted); }
+    .kpi .v { font-size:22px; font-weight:800; margin-top:4px; }
+    .kpi .v.minus { color:#b91c1c; }
+    .kpi .big { grid-column:1 / -1; background:#ecfdf5; border-color:#a7f3d0; }
+    table { width:100%; border-collapse:collapse; font-size:14px; margin-top:8px; }
+    td { padding:8px 4px; border-bottom:1px solid var(--line); vertical-align:top; }
+    td.r { text-align:right; white-space:nowrap; }
+    .tag { display:inline-block; font-size:11px; padding:2px 7px; border-radius:999px; background:#e5e5e5; margin-right:6px; }
+    .tag.s { background:#dbeafe; }
+    .tag.y { background:#fce7f3; }
     .hidden { display:none; }
     .tiny { font-size:12px; color:var(--muted); margin-top:8px; }
   </style>
 </head>
 <body>
 <main>
-  <h1>📸 レシート登録</h1>
-  <p class="sub">撮る → 確認 → 家計簿に登録</p>
+  <h1>📸 家計簿</h1>
+  <p class="sub">レシート登録 / お金の動き</p>
 
+  <div class="tabs">
+    <button id="tabReg" type="button" class="active" onclick="showTab('reg')">登録</button>
+    <button id="tabView" type="button" onclick="showTab('view')">お金の動き</button>
+  </div>
+
+  <div id="viewPane" class="hidden">
+    <section class="card">
+      <span class="label">月を選ぶ</span>
+      <select id="monthSelect" onchange="loadSummary(this.value)"></select>
+      <div id="viewStatus" class="status"></div>
+      <div id="summary" class="hidden">
+        <div class="kpi">
+          <div class="big"><div class="k">貯金に回せる額（今月の余り）</div><div id="kLeftover" class="v"></div></div>
+          <div><div class="k">翔平 受け取り</div><div id="kReceive" class="v"></div></div>
+          <div><div class="k">予算</div><div id="kBudget" class="v"></div></div>
+          <div><div class="k">ゆみこ 支出合計</div><div id="kYumiko" class="v"></div></div>
+          <div><div class="k">翔平 支出合計</div><div id="kShohei" class="v"></div></div>
+          <div class="big" style="background:#fafafa;border-color:var(--line)"><div class="k">差額</div><div id="kDiff" class="v"></div><div id="kDiffNote" class="tiny"></div></div>
+        </div>
+        <div id="savings" class="tiny"></div>
+      </div>
+    </section>
+
+    <section id="fixedCard" class="card hidden">
+      <span class="label">固定費</span>
+      <table id="fixedTable"></table>
+    </section>
+
+    <section id="entriesCard" class="card hidden">
+      <span class="label">明細（新しい順）</span>
+      <table id="entriesTable"></table>
+    </section>
+  </div>
+
+  <div id="regPane">
   <form id="receiptForm" class="card" onsubmit="analyze(this); return false;">
     <span class="label">誰が払った？</span>
     <div class="seg">
@@ -78,6 +129,7 @@
     <button id="saveBtn" type="button" onclick="save()">家計簿に登録</button>
     <div id="saveStatus" class="status"></div>
   </section>
+  </div>
 </main>
 
 <script>
@@ -141,6 +193,7 @@
         document.getElementById('receiptForm').reset();
         document.getElementById('payerY').checked = true;
         current = null;
+        monthsLoaded = false;
         setTimeout(() => {
           document.getElementById('resultCard').classList.add('hidden');
           document.getElementById('readStatus').textContent = '';
@@ -152,6 +205,90 @@
         btn.disabled = false;
       })
       .saveReceipt(payload);
+  }
+
+
+  /* ---------- 閲覧 ---------- */
+  let monthsLoaded = false;
+  let currentMonth = null;
+
+  function showTab(name) {
+    document.getElementById('regPane').classList.toggle('hidden', name !== 'reg');
+    document.getElementById('viewPane').classList.toggle('hidden', name !== 'view');
+    document.getElementById('tabReg').classList.toggle('active', name === 'reg');
+    document.getElementById('tabView').classList.toggle('active', name === 'view');
+    if (name === 'view' && !monthsLoaded) loadMonths();
+  }
+
+  function loadMonths() {
+    const status = document.getElementById('viewStatus');
+    status.textContent = '読み込み中…';
+    google.script.run
+      .withSuccessHandler(res => {
+        monthsLoaded = true;
+        const sel = document.getElementById('monthSelect');
+        sel.innerHTML = '';
+        res.sheets.forEach(n => {
+          const o = document.createElement('option');
+          o.value = n; o.textContent = monthLabel(n);
+          sel.appendChild(o);
+        });
+        sel.value = res.current;
+        loadSummary(res.current);
+      })
+      .withFailureHandler(err => { status.textContent = 'エラー：' + (err && err.message ? err.message : err); })
+      .listMonthSheets();
+  }
+
+  function loadSummary(name) {
+    currentMonth = name;
+    const status = document.getElementById('viewStatus');
+    status.textContent = '読み込み中…';
+    google.script.run
+      .withSuccessHandler(d => {
+        status.textContent = '';
+        document.getElementById('summary').classList.remove('hidden');
+        setMoney('kLeftover', d.leftover);
+        setMoney('kReceive', d.shoheiReceive);
+        setMoney('kBudget', d.budget);
+        setMoney('kYumiko', d.yumikoTotal);
+        setMoney('kShohei', d.shoheiTotal);
+        setMoney('kDiff', d.diff);
+        document.getElementById('kDiffNote').textContent =
+          d.diff > 0 ? '翔平が ' + yen(d.diff) + ' 多く払っている' :
+          d.diff < 0 ? 'ゆみこが ' + yen(-d.diff) + ' 多く払っている' : '同額';
+
+        const sv = document.getElementById('savings');
+        sv.textContent = d.savings
+          ? '余り金の累計残高：' + yen(d.savings.balance) + '（' + d.savings.year + '年' + d.savings.month + '時点）'
+          : '';
+
+        const ft = document.getElementById('fixedTable');
+        ft.innerHTML = d.fixed.map(f =>
+          '<tr><td>' + escapeHtml(f.label) + '</td><td class="r">' + yen(f.amount) + '</td></tr>').join('');
+        document.getElementById('fixedCard').classList.toggle('hidden', d.fixed.length === 0);
+
+        const et = document.getElementById('entriesTable');
+        et.innerHTML = d.entries.length
+          ? d.entries.map(e =>
+              '<tr><td><span class="tag ' + (e.payer === '翔平' ? 's' : 'y') + '">' + escapeHtml(e.payer) + '</span>' +
+              escapeHtml(e.date) + '</td><td>' + escapeHtml(e.description || '') + '</td><td class="r">' + yen(e.amount) + '</td></tr>').join('')
+          : '<tr><td>まだ登録がありません</td></tr>';
+        document.getElementById('entriesCard').classList.remove('hidden');
+      })
+      .withFailureHandler(err => { status.textContent = 'エラー：' + (err && err.message ? err.message : err); })
+      .getMonthSummary(name);
+  }
+
+  function setMoney(id, v) {
+    const el = document.getElementById(id);
+    el.textContent = v === null || v === undefined ? '—' : yen(v);
+    el.classList.toggle('minus', typeof v === 'number' && v < 0);
+  }
+  function yen(v) { return '¥' + Math.round(Number(v) || 0).toLocaleString('ja-JP'); }
+  function monthLabel(n) {
+    const m = String(n).match(/^(\d{2})(\d{1,2})$/);
+    return m ? '20' + m[1] + '年' + Number(m[2]) + '月' : n;
   }
 
   function escapeHtml(s) {
