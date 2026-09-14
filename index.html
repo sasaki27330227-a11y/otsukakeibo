@@ -79,7 +79,10 @@
         <p>レシートから自動入力</p>
       </div>
     </div>
-    <button class="settings" type="button" id="settingsBtn">設定</button>
+    <div style="display:flex;gap:6px;flex:0 0 auto">
+      <button class="settings" type="button" id="reloadBtn" title="更新">↻ 更新</button>
+      <button class="settings" type="button" id="settingsBtn">設定</button>
+    </div>
   </header>
 
   <div id="frameWrap">
@@ -138,14 +141,19 @@
     }
   }
 
+  function currentUrl() {
+    const v = localStorage.getItem(KEY);
+    return v && isValidGasUrl(v) ? v : DEFAULT_GAS_URL;
+  }
+
   function openApp(url) {
-    frame.src = url;
+    frame.src = url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now();
     frame.classList.remove('hidden');
     setup.classList.add('hidden');
   }
 
   function showSetup(canCancel = false) {
-    const current = localStorage.getItem(KEY) || '';
+    const current = currentUrl();
     urlInput.value = current;
     errorBox.textContent = '';
     setup.classList.remove('hidden');
@@ -163,17 +171,10 @@
   });
 
   document.getElementById('settingsBtn').addEventListener('click', () => showSetup(true));
-  cancelBtn.addEventListener('click', () => {
-    const current = localStorage.getItem(KEY);
-    if (current) openApp(current);
-  });
+  cancelBtn.addEventListener('click', () => openApp(currentUrl()));
+  document.getElementById('reloadBtn').addEventListener('click', () => openApp(currentUrl()));
 
-  const saved = localStorage.getItem(KEY) || DEFAULT_GAS_URL;
-  if (saved && isValidGasUrl(saved)) {
-    openApp(saved);
-  } else {
-    showSetup(false);
-  }
+  openApp(currentUrl());
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
