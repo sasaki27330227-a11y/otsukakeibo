@@ -83,7 +83,8 @@ function analyzeReceipt(formObject) {
     receiptFileId: receiptFile.getId(),
     receiptUrl: receiptFile.getUrl(),
     warning: ocrWarning || parsed.warning || '',
-    detectedSheet: getMonthSheetName_(parsed.date || today)
+    detectedSheet: getMonthSheetName_(parsed.date || today),
+    ocrText: String(ocrText || '').slice(0, 3000)
   };
 }
 
@@ -332,27 +333,53 @@ function toIsoDate_(y, m, d) {
 }
 
 function extractTotalAmount_(lines) {
-  const priority = [
-    /税込\s*合計/i,
-    /お支払(?:い)?(?:額)?/i,
-    /支払\s*合計/i,
-    /総\s*合計/i,
-    /合\s*計/i,
-    /現\s*計/i,
-    /grand\s*total/i,
-    /total/i
+  const totalKeys = [
+    /税込\s*合計/i, /お支払(?:い)?(?:額|金額)?/i, /支払\s*合計/i, /総\s*合計/i,
+    /合\s*計/i, /現\s*計/i, /grand\s*total/i, /\btotal\b/i
   ];
-  const exclude = /小計|消費税|税率|外税|内税|値引|割引|お預|預り|預かり|釣銭|おつり|change|ポイント/i;
+  const exclude = /小計|消費税|税率|外税|内税|対象|値引|割引|預|釣|つり|change|ポイント|残高|クーポン/i;
+  const depositRe = /預/;           // お預かり
+  const changeRe = /釣|つり/;        // お釣り
 
-  for (const key of priority) {
-    for (const line of lines) {
+  // 「お預かり」「お釣り」の金額を先に押さえておく（合計 = 預かり - 釣り の検算用）
+  let deposit = 0, change = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (depositRe.test(line) && !deposit) {
+      const n = firstNumberFrom_(lines, i);
+      if (n > 0) deposit = n;
+    }
+    if (changeRe.test(line) && change < 0) {
+      const n = firstNumberFrom_(lines, i, true);
+      if (n >= 0) change = n;
+    }
+  }
+  const derived = (deposit > 0 && change >= 0 && deposit - change > 0) ? deposit - change : 0;
+
+  // 合計キーワード行（同じ行に数字がなければ次の行を見る）
+  for (const key of totalKeys) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
       if (!key.test(line) || exclude.test(line)) continue;
-      const nums = extractMoneyNumbers_(line);
-      if (nums.length) return Math.max.apply(null, nums);
+      const n = firstNumberFrom_(lines, i);
+      if (n > 0) {
+        // 預かり-釣り と一致するならそれで確定。矛盾したら預かり額そのものは避ける
+        if (derived && n === deposit) return derived;
+        return n;
+      }
     }
   }
 
-  // キーワード行で取れなければ「円」「¥」がある行から最大値を拾う。
+  if (derived) return derived;
+
+  // 列ごとに読まれた場合（項目名と金額が別行）：「合計・預かり・釣り」の並びを数字列から探す
+  const seq = [];
+  for (const line of lines) seq.push.apply(seq, extractMoneyNumbers_(line));
+  for (let i = 0; i + 2 < seq.length; i++) {
+    if (seq[i] > 0 && seq[i + 1] > seq[i] && seq[i] === seq[i + 1] - seq[i + 2]) return seq[i];
+  }
+
+  // 最後の手段：除外語のない「¥」「円」行の最大値
   const candidates = [];
   for (const line of lines) {
     if (exclude.test(line)) continue;
@@ -363,11 +390,32 @@ function extractTotalAmount_(lines) {
   return filtered.length ? Math.max.apply(null, filtered) : 0;
 }
 
+/** i行目のキーワード以降の数字。なければ次の1〜2行から拾う（次行が別キーワード行なら拾わない） */
+function firstNumberFrom_(lines, i, allowZero) {
+  const keyword = /合計|計|預|釣|つり|支払|total/i;
+  const stripped = lines[i].replace(/^.*?(合\s*計|計|預かり|預り|釣り?|つり|支払い?|total)/i, '');
+  let nums = extractMoneyNumbers_(stripped);
+  if (!nums.length) nums = extractMoneyNumbers_(lines[i]);
+  nums = nums.filter(n => allowZero ? n >= 0 : n > 0);
+  if (nums.length) return nums[nums.length - 1];
+  for (let k = 1; k <= 2 && i + k < lines.length; k++) {
+    const next = lines[i + k];
+    if (keyword.test(next)) break;
+    const nn = extractMoneyNumbers_(next).filter(n => allowZero ? n >= 0 : n > 0);
+    if (nn.length) return nn[0];
+  }
+  return allowZero ? -1 : 0;
+}
+
 function extractMoneyNumbers_(line) {
   const out = [];
+  const cleaned = String(line)
+    .replace(/\d{1,2}:\d{2}/g, ' ')                 // 時刻
+    .replace(/\d{2,4}[-\/.]\d{1,2}[-\/.]\d{1,4}/g, ' ')  // 日付
+    .replace(/\d{2,4}-\d{2,4}-\d{3,4}/g, ' ');       // 電話番号
   const re = /(?:¥\s*)?(\d{1,3}(?:,\d{3})+|\d{1,7})(?:\s*円)?/g;
   let m;
-  while ((m = re.exec(line)) !== null) {
+  while ((m = re.exec(cleaned)) !== null) {
     const n = Number(m[1].replace(/,/g, ''));
     if (Number.isFinite(n)) out.push(n);
   }
