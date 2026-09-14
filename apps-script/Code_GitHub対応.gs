@@ -508,6 +508,7 @@ function getMonthSummary(sheetName) {
       if (amt === '' || amt === null) continue;
       entries.push({
         payer: payer,
+        row: r + 1,
         date: displays[r][dCol] || '',
         sortKey: values[r][dCol] instanceof Date ? values[r][dCol].getTime() : 0,
         amount: toNum_(amt),
@@ -655,4 +656,31 @@ function linkSavingsTab_(ss, sheetName, year, month) {
   sv.getRange(row, 14).setValue(month + '月');
   sv.getRange(row, 15).setFormula(ref);
   sv.getRange(row, 16).setFormula('=P' + (row - 1) + '+O' + row);
+}
+
+
+/** 明細を1件削除（該当行の日付・金額・内容を空にする。行自体は残す） */
+function deleteEntry(data) {
+  if (!data || !data.sheetName || !data.payer || !data.row) throw new Error('削除対象が不正です。');
+  const map = RECEIPT_APP.PAYERS[String(data.payer)];
+  if (!map) throw new Error('支払者が不正です。');
+  const row = Number(data.row);
+  if (!Number.isFinite(row) || row < 2) throw new Error('行番号が不正です。');
+
+  const ss = getHouseholdSpreadsheet_();
+  const sheet = ss.getSheetByName(String(data.sheetName));
+  if (!sheet) throw new Error('月タブ「' + data.sheetName + '」が見つかりません。');
+
+  const totalRow = findTotalRow_(sheet);
+  if (row >= totalRow) throw new Error('合計行より下は削除できません。');
+
+  // 念のため内容が一致するか確認
+  const cur = sheet.getRange(row, map.amountCol).getValue();
+  if (data.amount !== undefined && Number(cur) !== Number(data.amount)) {
+    throw new Error('データが変わっています。更新してからやり直してください。');
+  }
+
+  sheet.getRange(row, map.dateCol, 1, 3).clearContent().clearNote();
+  SpreadsheetApp.flush();
+  return { ok: true, message: '削除しました。' };
 }

@@ -49,6 +49,7 @@
     .tag { display:inline-block; font-size:10px; padding:2px 8px; border-radius:999px; border:1.5px solid var(--navy); color:var(--navy); margin-right:6px; font-weight:900; letter-spacing:.08em; }
     .tag.s { background:var(--navy); color:#F2EFE8; }
     .tag.y { background:var(--red); border-color:var(--red); color:#F2EFE8; }
+    button.del { width:auto; padding:4px 10px; font-size:11px; letter-spacing:.05em; background:#fff; color:var(--red); border:1.5px solid var(--red); border-radius:999px; margin-left:6px; }
     .stripes { height:2px; background:var(--navy); margin:0 0 16px; }
     .hidden { display:none; }
   </style>
@@ -312,12 +313,27 @@
         et.innerHTML = d.entries.length
           ? d.entries.map(e =>
               '<tr><td><span class="tag ' + (e.payer === '翔平' ? 's' : 'y') + '">' + escapeHtml(e.payer) + '</span>' +
-              escapeHtml(e.date) + '</td><td>' + escapeHtml(e.description || '') + '</td><td class="r">' + yen(e.amount) + '</td></tr>').join('')
+              escapeHtml(e.date) + '</td><td>' + escapeHtml(e.description || '') + '</td><td class="r">' + yen(e.amount) +
+              '<button type="button" class="del" onclick="deleteEntry(' + e.row + ',\'' + e.payer + '\',' + e.amount + ',\'' + escapeHtml(e.description || '') + '\')">削除</button></td></tr>').join('')
           : '<tr><td>まだ登録がありません</td></tr>';
         document.getElementById('entriesCard').classList.remove('hidden');
       })
       .withFailureHandler(err => { status.textContent = 'エラー：' + (err && err.message ? err.message : err); })
       .getMonthSummary(name);
+  }
+
+  function deleteEntry(row, payer, amount, desc) {
+    if (!currentMonth) return;
+    if (!confirm('この明細を削除しますか？\n' + payer + ' / ' + desc + ' / ' + yen(amount))) return;
+    const status = document.getElementById('viewStatus');
+    status.textContent = '削除中…';
+    google.script.run
+      .withSuccessHandler(res => {
+        status.textContent = res.message || '削除しました。';
+        loadSummary(currentMonth);
+      })
+      .withFailureHandler(err => { status.textContent = 'エラー：' + (err && err.message ? err.message : err); })
+      .deleteEntry({ sheetName: currentMonth, payer: payer, row: row, amount: amount });
   }
 
   function setMoney(id, v) {
