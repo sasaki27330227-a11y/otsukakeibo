@@ -98,11 +98,12 @@
 
     <div class="field">
       <span class="label">レシート</span>
-      <input id="receipt" name="receipt" type="file" accept="image/*" capture="environment" required>
-      <div class="tiny">スマホでは「写真を撮る」を選べます。</div>
+      <input id="receipt" name="receipt" type="file" accept="image/*" required>
+      <div class="tiny">タップすると「写真を撮る」か「フォトライブラリ」を選べます。</div>
     </div>
 
     <button id="readBtn" type="submit">レシートを読み取る</button>
+    <button type="button" class="secondary" style="margin-top:8px" onclick="manualEntry()">レシートなしで手入力</button>
     <div id="readStatus" class="status"></div>
   </form>
 
@@ -148,6 +149,19 @@
     document.getElementById('saveStatus').textContent = '';
     document.getElementById('saveBtn').disabled = false;
     document.getElementById('resultCard').classList.add('hidden');
+  }
+
+  function manualEntry() {
+    clearResult();
+    const payer = document.querySelector('input[name="payer"]:checked').value;
+    const today = new Date();
+    const iso = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+    current = { payer: payer, receiptFileId: '', receiptUrl: '' };
+    document.getElementById('date').value = iso;
+    document.getElementById('target').textContent = '手入力 / ' + payer + '（日付の月のタブに登録されます）';
+    document.getElementById('readStatus').textContent = '';
+    document.getElementById('resultCard').classList.remove('hidden');
+    setTimeout(() => document.getElementById('amount').focus(), 100);
   }
 
   function analyze(form) {
