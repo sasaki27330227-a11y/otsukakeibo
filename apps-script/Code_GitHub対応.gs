@@ -107,9 +107,9 @@ function saveReceipt(data) {
   if (!description) throw new Error('店名・内容を入力してください。');
 
   const ss = getHouseholdSpreadsheet_();
-  const sheetName = getMonthSheetName_(dateString);
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) throw new Error('月タブ「' + sheetName + '」が見つかりません。先に月タブを作成してください。');
+  const created = getOrCreateMonthSheet_(ss, dateString);
+  const sheet = created.sheet;
+  const sheetName = sheet.getName();
 
   const totalRow = findTotalRow_(sheet);
   const row = findOrCreateEmptyRow_(sheet, totalRow, map);
@@ -132,7 +132,7 @@ function saveReceipt(data) {
     ok: true,
     sheetName: sheetName,
     row: row,
-    message: sheetName + ' の ' + row + '行目に登録しました。'
+    message: (created.isNew ? '月タブ「' + sheetName + '」を新しく作成しました。\n' : '') + sheetName + ' の ' + row + '行目に登録しました。'
   };
 }
 
@@ -554,4 +554,105 @@ function toNum_(v) {
   if (v === '' || v === null || v === undefined) return 0;
   const n = Number(String(v).replace(/,/g, ''));
   return Number.isFinite(n) ? n : 0;
+}
+
+
+/* =========================================================
+ * 月タブの自動作成（前月タブをコピー）
+ * ========================================================= */
+
+/** 日付に対応する月タブを返す。無ければ直近の月タブをコピーして作る。 */
+function getOrCreateMonthSheet_(ss, dateString) {
+  const m = String(dateString).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) throw new Error('日付形式が不正です。');
+  const year = Number(m[1]), month = Number(m[2]);
+  const key = (year % 100) * 100 + month;
+
+  const sheets = ss.getSheets();
+  const existing = sheets.find(sh => monthKey_(sh.getName()) === key);
+  if (existing) return { sheet: existing, isNew: false };
+
+  // コピー元：対象月より前で一番新しい月タブ（無ければ全体で最新）
+  const monthSheets = sheets.filter(sh => monthKey_(sh.getName()) > 0);
+  if (!monthSheets.length) throw new Error('コピー元になる月タブがありません。');
+  const before = monthSheets.filter(sh => monthKey_(sh.getName()) < key);
+  const pool = before.length ? before : monthSheets;
+  const src = pool.reduce((a, b) => monthKey_(a.getName()) >= monthKey_(b.getName()) ? a : b);
+
+  const newName = formatMonthName_(src.getName(), year, month);
+  const sheet = src.copyTo(ss).setName(newName);
+  ss.setActiveSheet(sheet);
+  ss.moveActiveSheet(src.getIndex() + 1);
+
+  clearMonthEntries_(sheet);
+  try { linkSavingsTab_(ss, sheet.getName(), year, month); } catch (e) { console.warn(e); }
+
+  return { sheet: sheet, isNew: true };
+}
+
+/** コピー元タブ名の表記（26/9, 269, 2026年9月 …）に合わせて新しい名前を作る */
+function formatMonthName_(srcName, year, month) {
+  const n = String(srcName).normalize('NFKC').trim();
+  const yy = String(year % 100).padStart(2, '0');
+  let mm = n.match(/^(20)?(\d{2})(\s*[\/\.\-_年]\s*)(\d{1,2})(\s*月?)$/);
+  if (mm) {
+    const prefix = mm[1] ? '20' : '';
+    const two = /^\d{2}$/.test(mm[4]);
+    return prefix + yy + mm[3] + (two ? String(month).padStart(2, '0') : String(month)) + mm[5];
+  }
+  return yy + month; // 269 形式
+}
+
+/** 明細・固定費の入力欄を空にする（数式・書式は残す） */
+function clearMonthEntries_(sheet) {
+  const totalRow = findTotalRow_(sheet);
+  const rows = Math.max(0, totalRow - 2);
+  if (rows > 0) {
+    sheet.getRange(2, 4, rows, 3).clearContent().clearNote(); // D:F ゆみこ
+    sheet.getRange(2, 8, rows, 3).clearContent().clearNote(); // H:J 翔平
+  }
+  // B3:B12 の固定費（数式でないセルだけ空に。予算B2は残す）
+  const rng = sheet.getRange(3, 2, 10, 1);
+  const formulas = rng.getFormulas();
+  const values = rng.getValues();
+  const labels = sheet.getRange(3, 1, 10, 1).getValues();
+  for (let i = 0; i < 10; i++) {
+    const label = String(labels[i][0] || '').trim();
+    if (!formulas[i][0] && values[i][0] !== '' && label && !/余り|受け取り/.test(label)) {
+      sheet.getRange(3 + i, 2).clearContent();
+    }
+  }
+  SpreadsheetApp.flush();
+}
+
+/** 「余り金」タブの該当月に ='タブ名'!B9 を入れる（未入力の場合のみ） */
+function linkSavingsTab_(ss, sheetName, year, month) {
+  const sv = ss.getSheetByName('余り金');
+  if (!sv) return;
+  const last = Math.max(sv.getLastRow(), 6);
+  const vals = sv.getRange(1, 13, last, 4).getValues();     // M:P
+  const forms = sv.getRange(1, 13, last, 4).getFormulas();
+  const ref = "='" + sheetName.replace(/'/g, "''") + "'!B9";
+
+  let curYear = null, targetRow = 0, lastRow = 0;
+  for (let r = 0; r < vals.length; r++) {
+    if (vals[r][0] !== '' && vals[r][0] !== null) curYear = Number(vals[r][0]);
+    const monthCell = String(vals[r][1] || '').trim();
+    if (monthCell) lastRow = r + 1;
+    if (curYear === year && monthCell === month + '月') { targetRow = r + 1; break; }
+  }
+
+  if (targetRow) {
+    if (!forms[targetRow - 1][2] && (vals[targetRow - 1][2] === '' || vals[targetRow - 1][2] === null)) {
+      sv.getRange(targetRow, 15).setFormula(ref);
+    }
+    return;
+  }
+
+  // 行が無ければ末尾に追加（年が変わる場合はM列に年も入れる）
+  const row = lastRow + 1;
+  if (curYear !== year || month === 1) sv.getRange(row, 13).setValue(year);
+  sv.getRange(row, 14).setValue(month + '月');
+  sv.getRange(row, 15).setFormula(ref);
+  sv.getRange(row, 16).setFormula('=P' + (row - 1) + '+O' + row);
 }
