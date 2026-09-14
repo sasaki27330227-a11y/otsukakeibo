@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <style>
+    :root { color-scheme: light; --bg:#f5f5f4; --card:#fff; --ink:#171717; --muted:#737373; --line:#e5e5e5; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--ink); }
+    main { max-width:520px; margin:0 auto; padding:20px 16px 42px; }
+    h1 { font-size:26px; margin:6px 0 4px; }
+    .sub { margin:0 0 18px; color:var(--muted); font-size:14px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px; margin:12px 0; box-shadow:0 4px 18px rgba(0,0,0,.04); }
+    .label { display:block; font-size:12px; font-weight:700; margin-bottom:8px; color:#525252; }
+    .seg { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .seg input { display:none; }
+    .seg label { text-align:center; padding:13px 10px; border:1px solid var(--line); border-radius:12px; font-weight:700; background:#fafafa; }
+    .seg input:checked + label { background:#171717; color:#fff; border-color:#171717; }
+    input[type="file"], input[type="date"], input[type="number"], input[type="text"] { width:100%; border:1px solid var(--line); border-radius:12px; padding:13px 12px; background:#fff; font-size:16px; }
+    button { width:100%; border:0; border-radius:14px; padding:15px 14px; font-size:16px; font-weight:800; background:#171717; color:#fff; cursor:pointer; }
+    button.secondary { background:#e5e5e5; color:#171717; }
+    button:disabled { opacity:.45; cursor:default; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .field { margin:12px 0; }
+    .status { font-size:14px; line-height:1.55; margin-top:12px; color:#525252; }
+    .warn { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:10px 12px; border-radius:12px; font-size:13px; margin-top:10px; }
+    .ok { background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; padding:12px; border-radius:12px; font-size:14px; margin-top:10px; }
+    .hidden { display:none; }
+    .tiny { font-size:12px; color:var(--muted); margin-top:8px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>📸 レシート登録</h1>
+  <p class="sub">撮る → 確認 → 家計簿に登録</p>
+
+  <form id="receiptForm" class="card" onsubmit="analyze(this); return false;">
+    <span class="label">誰が払った？</span>
+    <div class="seg">
+      <input id="payerY" type="radio" name="payer" value="ゆみこ" checked>
+      <label for="payerY">ゆみこ</label>
+      <input id="payerS" type="radio" name="payer" value="翔平">
+      <label for="payerS">翔平</label>
+    </div>
+
+    <div class="field">
+      <span class="label">レシート</span>
+      <input id="receipt" name="receipt" type="file" accept="image/*" capture="environment" required>
+      <div class="tiny">スマホでは「写真を撮る」を選べます。</div>
+    </div>
+
+    <button id="readBtn" type="submit">レシートを読み取る</button>
+    <div id="readStatus" class="status"></div>
+  </form>
+
+  <section id="resultCard" class="card hidden">
+    <span class="label">読み取り結果</span>
+
+    <div class="grid">
+      <div class="field">
+        <span class="label">日付</span>
+        <input id="date" type="date">
+      </div>
+      <div class="field">
+        <span class="label">合計金額</span>
+        <input id="amount" type="number" min="1" inputmode="numeric">
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="label">店名・内容</span>
+      <input id="description" type="text" placeholder="例：ヨーカドー">
+    </div>
+
+    <div id="warning" class="warn hidden"></div>
+    <div id="target" class="tiny"></div>
+    <button id="saveBtn" type="button" onclick="save()">家計簿に登録</button>
+    <div id="saveStatus" class="status"></div>
+  </section>
+</main>
+
+<script>
+  let current = null;
+
+  function analyze(form) {
+    const btn = document.getElementById('readBtn');
+    const status = document.getElementById('readStatus');
+    btn.disabled = true;
+    status.textContent = '読み取り中…';
+    document.getElementById('resultCard').classList.add('hidden');
+
+    google.script.run
+      .withSuccessHandler(data => {
+        current = data;
+        document.getElementById('date').value = data.date || '';
+        document.getElementById('amount').value = data.amount || '';
+        document.getElementById('description').value = data.description || '';
+        document.getElementById('target').textContent = '登録先予定：' + data.detectedSheet + ' タブ / ' + data.payer;
+
+        const warning = document.getElementById('warning');
+        if (data.warning) {
+          warning.textContent = data.warning;
+          warning.classList.remove('hidden');
+        } else {
+          warning.classList.add('hidden');
+        }
+
+        document.getElementById('resultCard').classList.remove('hidden');
+        status.textContent = '読み取り完了。内容だけ確認してください。';
+        btn.disabled = false;
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      })
+      .withFailureHandler(err => {
+        status.textContent = 'エラー：' + (err && err.message ? err.message : err);
+        btn.disabled = false;
+      })
+      .analyzeReceipt(form);
+  }
+
+  function save() {
+    if (!current) return;
+    const btn = document.getElementById('saveBtn');
+    const status = document.getElementById('saveStatus');
+    btn.disabled = true;
+    status.textContent = '登録中…';
+
+    const payload = {
+      payer: current.payer,
+      date: document.getElementById('date').value,
+      amount: document.getElementById('amount').value,
+      description: document.getElementById('description').value,
+      receiptFileId: current.receiptFileId,
+      receiptUrl: current.receiptUrl
+    };
+
+    google.script.run
+      .withSuccessHandler(res => {
+        status.innerHTML = '<div class="ok">' + escapeHtml(res.message) + '</div>';
+        btn.disabled = false;
+        document.getElementById('receiptForm').reset();
+        document.getElementById('payerY').checked = true;
+        current = null;
+        setTimeout(() => {
+          document.getElementById('resultCard').classList.add('hidden');
+          document.getElementById('readStatus').textContent = '';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 1500);
+      })
+      .withFailureHandler(err => {
+        status.textContent = 'エラー：' + (err && err.message ? err.message : err);
+        btn.disabled = false;
+      })
+      .saveReceipt(payload);
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  }
+</script>
+</body>
+</html>
