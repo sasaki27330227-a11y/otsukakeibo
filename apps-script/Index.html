@@ -114,6 +114,16 @@
   <section id="resultCard" class="card hidden">
     <span class="label">Check — 読み取り結果</span>
 
+    <div class="field">
+      <span class="label">誰が払った？</span>
+      <div class="seg">
+        <input id="resPayerY" type="radio" name="resPayer" value="ゆみこ" checked>
+        <label for="resPayerY">ゆみこ</label>
+        <input id="resPayerS" type="radio" name="resPayer" value="翔平">
+        <label for="resPayerS">翔平</label>
+      </div>
+    </div>
+
     <div class="grid">
       <div class="field">
         <span class="label">日付</span>
@@ -177,27 +187,74 @@
     const today = new Date();
     const iso = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
     current = { payer: payer, receiptFileId: '', receiptUrl: '' };
+    setResPayer(payer);
     document.getElementById('date').value = iso;
-    document.getElementById('target').textContent = '手入力 / ' + payer + '（日付の月のタブに登録されます）';
+    document.getElementById('target').textContent = '手入力（日付の月のタブに登録されます）';
     document.getElementById('readStatus').textContent = '';
     document.getElementById('resultCard').classList.remove('hidden');
     setTimeout(() => document.getElementById('amount').focus(), 100);
   }
 
-  function analyze(form) {
+  function setResPayer(p) {
+    document.getElementById(p === '翔平' ? 'resPayerS' : 'resPayerY').checked = true;
+  }
+  function getResPayer() {
+    return document.querySelector('input[name="resPayer"]:checked').value;
+  }
+
+  // 画像を長辺1600px・JPEG品質0.8に縮小（アップロードとOCRを高速化）
+  function shrinkImage(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const MAX = 1600;
+          let w = img.naturalWidth, h = img.naturalHeight;
+          const scale = Math.min(1, MAX / Math.max(w, h));
+          w = Math.round(w * scale); h = Math.round(h * scale);
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
+          const dataUrl = c.toDataURL('image/jpeg', 0.8);
+          URL.revokeObjectURL(url);
+          resolve(dataUrl.split(',')[1]);
+        } catch (e) { reject(e); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('画像を読み込めませんでした。')); };
+      img.src = url;
+    });
+  }
+
+  async function analyze(form) {
     const btn = document.getElementById('readBtn');
     const status = document.getElementById('readStatus');
+    const file = document.getElementById('receipt').files[0];
+    if (!file) { status.textContent = 'レシート画像を選択してください。'; return; }
+    const payer = document.querySelector('input[name="payer"]:checked').value;
+
     btn.disabled = true;
-    status.textContent = '読み取り中…';
     clearResult();
+    status.textContent = '画像を準備中…';
+
+    let imageBase64;
+    try {
+      imageBase64 = await shrinkImage(file);
+    } catch (e) {
+      status.textContent = 'エラー：' + e.message;
+      btn.disabled = false;
+      return;
+    }
+    status.textContent = '読み取り中…';
 
     google.script.run
       .withSuccessHandler(data => {
         current = data;
+        setResPayer(data.payer);
         document.getElementById('date').value = data.date || '';
         document.getElementById('amount').value = data.amount || '';
         document.getElementById('description').value = data.description || '';
-        document.getElementById('target').textContent = '登録先予定：' + data.detectedSheet + ' タブ / ' + data.payer;
+        document.getElementById('target').textContent = '登録先予定：' + data.detectedSheet + ' タブ';
         document.getElementById('ocrText').textContent = data.ocrText || '（読み取れませんでした）';
         document.getElementById('ocrBox').classList.remove('hidden');
 
@@ -218,7 +275,7 @@
         status.textContent = 'エラー：' + (err && err.message ? err.message : err);
         btn.disabled = false;
       })
-      .analyzeReceipt(form);
+      .analyzeReceipt({ payer: payer, imageBase64: imageBase64, mimeType: 'image/jpeg' });
   }
 
   function save() {
@@ -229,7 +286,7 @@
     status.textContent = '登録中…';
 
     const payload = {
-      payer: current.payer,
+      payer: getResPayer(),
       date: document.getElementById('date').value,
       amount: document.getElementById('amount').value,
       description: document.getElementById('description').value,
@@ -286,10 +343,12 @@
           sel.appendChild(o);
         });
         sel.value = res.current;
-        loadSummary(res.current);
+        currentMonth = res.current;
+        renderSummary(res.summary);
+        status.textContent = '';
       })
       .withFailureHandler(err => { status.textContent = 'エラー：' + (err && err.message ? err.message : err); })
-      .listMonthSheets();
+      .getDashboard(currentMonth);
   }
 
   function loadSummary(name) {
@@ -297,8 +356,13 @@
     const status = document.getElementById('viewStatus');
     status.textContent = '読み込み中…';
     google.script.run
-      .withSuccessHandler(d => {
-        status.textContent = '';
+      .withSuccessHandler(d => { status.textContent = ''; renderSummary(d); })
+      .withFailureHandler(err => { status.textContent = 'エラー：' + (err && err.message ? err.message : err); })
+      .getMonthSummary(name);
+  }
+
+  function renderSummary(d) {
+    {
         document.getElementById('summary').classList.remove('hidden');
         setMoney('kLeftover', d.leftover);
         setMoney('kReceive', d.shoheiReceive);
@@ -328,9 +392,7 @@
               '<button type="button" class="del" onclick="deleteEntry(' + e.row + ',\'' + e.payer + '\',' + e.amount + ',\'' + escapeHtml(e.description || '') + '\')">削除</button></td></tr>').join('')
           : '<tr><td>まだ登録がありません</td></tr>';
         document.getElementById('entriesCard').classList.remove('hidden');
-      })
-      .withFailureHandler(err => { status.textContent = 'エラー：' + (err && err.message ? err.message : err); })
-      .getMonthSummary(name);
+    }
   }
 
   function deleteEntry(row, payer, amount, desc) {

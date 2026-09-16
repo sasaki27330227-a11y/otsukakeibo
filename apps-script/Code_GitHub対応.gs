@@ -49,15 +49,22 @@ function doGet() {
  * 画像を保存し、Google Drive OCRで日付・合計金額・店名を抽出する。
  * HTML側からは form 要素をそのまま渡す。
  */
-function analyzeReceipt(formObject) {
-  if (!formObject || !formObject.receipt) throw new Error('レシート画像を選択してください。');
-
-  const payer = String(formObject.payer || 'ゆみこ');
+function analyzeReceipt(payload) {
+  let blob, payer;
+  if (payload && payload.imageBase64) {
+    // 新方式：クライアントで縮小したJPEGをbase64で受け取る（高速）
+    payer = String(payload.payer || 'ゆみこ');
+    blob = Utilities.newBlob(Utilities.base64Decode(payload.imageBase64), payload.mimeType || 'image/jpeg', 'receipt.jpg');
+  } else if (payload && payload.receipt) {
+    // 旧方式：form要素そのまま
+    payer = String(payload.payer || 'ゆみこ');
+    blob = payload.receipt;
+  } else {
+    throw new Error('レシート画像を選択してください。');
+  }
   if (!RECEIPT_APP.PAYERS[payer]) throw new Error('支払者が不正です。');
 
-  const blob = formObject.receipt;
-  const originalName = blob.getName() || 'receipt.jpg';
-  const savedName = Utilities.formatDate(new Date(), RECEIPT_APP.TZ, 'yyyyMMdd_HHmmss') + '_' + originalName;
+  const savedName = Utilities.formatDate(new Date(), RECEIPT_APP.TZ, 'yyyyMMdd_HHmmss') + '_receipt.jpg';
   blob.setName(savedName);
 
   const folder = getOrCreateMonthFolder_(new Date());
@@ -250,7 +257,7 @@ function ocrBlob_(blob) {
     let lastError = null;
     for (let i = 0; i < 4; i++) {
       try {
-        Utilities.sleep(700 + i * 400);
+        if (i > 0) Utilities.sleep(400 * i);
         text = DocumentApp.openById(tempDoc.id).getBody().getText();
         if (text && text.trim()) break;
       } catch (err) {
@@ -334,14 +341,13 @@ function toIsoDate_(y, m, d) {
 
 function extractTotalAmount_(lines) {
   const totalKeys = [
-    /税込\s*合計/i, /お支払(?:い)?(?:額|金額)?/i, /支払\s*合計/i, /総\s*合計/i,
-    /合\s*計/i, /現\s*計/i, /grand\s*total/i, /\btotal\b/i
+    /合\s*計/i, /税込\s*合計/i, /総\s*合計/i, /お支払(?:い)?(?:額|金額)?/i, /支払\s*合計/i,
+    /支払(?:い)?(?:額|金額)/i, /現\s*計/i, /grand\s*total/i, /\btotal\b/i
   ];
-  const exclude = /小計|消費税|税率|外税|内税|対象|値引|割引|預|釣|つり|change|ポイント|残高|クーポン/i;
-  const depositRe = /預/;           // お預かり
-  const changeRe = /釣|つり/;        // お釣り
+  const exclude = /小計|消費税|税率|外税|内税|対象|値引|割引|預|釣|つり|change|ポイント|残高|クーポン|商品数|点数/i;
+  const depositRe = /預/;
+  const changeRe = /釣|つり/;
 
-  // 「お預かり」「お釣り」の金額を先に押さえておく（合計 = 預かり - 釣り の検算用）
   let deposit = 0, change = -1;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -356,38 +362,45 @@ function extractTotalAmount_(lines) {
   }
   const derived = (deposit > 0 && change >= 0 && deposit - change > 0) ? deposit - change : 0;
 
-  // 合計キーワード行（同じ行に数字がなければ次の行を見る）
+  // 1) 「合計」などのキーワード行（最優先）
   for (const key of totalKeys) {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (!key.test(line) || exclude.test(line)) continue;
       const n = firstNumberFrom_(lines, i);
       if (n > 0) {
-        // 預かり-釣り と一致するならそれで確定。矛盾したら預かり額そのものは避ける
         if (derived && n === deposit) return derived;
         return n;
       }
     }
   }
 
+  // 2) 預かり − 釣り
   if (derived) return derived;
 
-  // 列ごとに読まれた場合（項目名と金額が別行）：「合計・預かり・釣り」の並びを数字列から探す
+  // 3) 列読み：数字列の中で a = b - c の並び
   const seq = [];
-  for (const line of lines) seq.push.apply(seq, extractMoneyNumbers_(line));
+  for (const line of lines) {
+    if (exclude.test(line)) continue;
+    seq.push.apply(seq, extractMoneyNumbers_(line));
+  }
   for (let i = 0; i + 2 < seq.length; i++) {
-    if (seq[i] > 0 && seq[i + 1] > seq[i] && seq[i] === seq[i + 1] - seq[i + 2]) return seq[i];
+    if (seq[i] > 0 && seq[i + 1] >= seq[i] && seq[i] === seq[i + 1] - seq[i + 2]) return seq[i];
   }
 
-  // 最後の手段：除外語のない「¥」「円」行の最大値
-  const candidates = [];
+  // 4) 同じ金額が複数回出る（合計・支払額・IC支払 など）→ それを採用
+  const counts = {};
   for (const line of lines) {
     if (exclude.test(line)) continue;
     if (!/[¥円]/.test(line)) continue;
-    candidates.push.apply(candidates, extractMoneyNumbers_(line));
+    extractMoneyNumbers_(line).forEach(n => { if (n > 0 && n < 10000000) counts[n] = (counts[n] || 0) + 1; });
   }
-  const filtered = candidates.filter(n => n > 0 && n < 10000000);
-  return filtered.length ? Math.max.apply(null, filtered) : 0;
+  const repeated = Object.keys(counts).map(Number).filter(n => counts[n] >= 2);
+  if (repeated.length) return Math.max.apply(null, repeated);
+
+  // 5) 最後の手段：除外語のない「¥」「円」行の最大値
+  const candidates = Object.keys(counts).map(Number);
+  return candidates.length ? Math.max.apply(null, candidates) : 0;
 }
 
 /** i行目のキーワード以降の数字。なければ次の1〜2行から拾う（次行が別キーワード行なら拾わない） */
@@ -464,6 +477,13 @@ function monthKey_(name) {
   const yy = Number(m[2]), mo = Number(m[3]);
   if (mo < 1 || mo > 12) return 0;
   return yy * 100 + mo;
+}
+
+/** 月一覧＋サマリーを1回で返す（初回表示用） */
+function getDashboard(sheetName) {
+  const list = listMonthSheets();
+  const name = sheetName && list.sheets.indexOf(String(sheetName)) >= 0 ? String(sheetName) : list.current;
+  return { sheets: list.sheets, current: name, summary: getMonthSummary(name) };
 }
 
 /** 指定月タブのサマリーを返す */
