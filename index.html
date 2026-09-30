@@ -193,7 +193,8 @@
 
   /* ---------- API ---------- */
   async function api(action, payload) {
-    const res = await fetch(gasUrl(), { method: 'POST', body: JSON.stringify(Object.assign({ action: action }, payload || {})) });
+    const res = await fetch(gasUrl(), { method: 'POST', credentials: 'omit', redirect: 'follow', body: JSON.stringify(Object.assign({ action: action }, payload || {})) });
+    if (res.status === 401 || res.status === 403) throw new Error('Apps Script にアクセスできません（' + res.status + '）。デプロイの「アクセスできるユーザー」が「全員」か確認してください。');
     const text = await res.text();
     let j;
     try { j = JSON.parse(text); } catch (e) { throw new Error('サーバーの応答が不正です。Apps Scriptのデプロイを確認してください。'); }

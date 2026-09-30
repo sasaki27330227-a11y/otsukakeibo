@@ -1,4 +1,4 @@
-const CACHE = 'receipt-kakeibo-v2';
+const CACHE = 'tsuketsuke-v3';
 const ASSETS = [
   './manifest.webmanifest',
   './icon-192.png',
