@@ -63,6 +63,7 @@ function handle_(action, p) {
       case 'save':      data = saveReceipt(p); break;
       case 'delete':    data = deleteEntry(p); break;
       case 'cancel':    data = cancelReceipt(p.fileId); break;
+      case 'setFixed':  data = setFixedCost(p); break;
       default: throw new Error('不明なアクション: ' + action);
     }
     return jsonOut_({ ok: true, data: data });
@@ -549,6 +550,7 @@ function getMonthSummary(sheetName) {
   const lastRow = Math.max(sheet.getLastRow(), totalRow + 3);
   const values = sheet.getRange(1, 1, lastRow, 10).getValues();
   const displays = sheet.getRange(1, 1, lastRow, 10).getDisplayValues();
+  const formulasB = sheet.getRange(1, 2, lastRow, 1).getFormulas();
 
   // 左側（A/B列）：予算・固定費・余り・翔平受け取り
   const budget = toNum_(values[1][1]); // B2
@@ -560,7 +562,7 @@ function getMonthSummary(sheetName) {
     if (!label) continue;
     if (label === '余り' || label === '余り1') { if (leftover === null) leftover = toNum_(v); continue; }
     if (label === '翔平受け取り') { shoheiReceive = toNum_(v); continue; }
-    if (r <= 9 && v !== '') fixed.push({ label: label, amount: toNum_(v) });
+    if (r <= 11 && v !== '') fixed.push({ label: label, amount: toNum_(v), row: r + 1, editable: !formulasB[r][0] });
   }
   if (shoheiReceive === null && leftover !== null) shoheiReceive = budget - leftover;
 
@@ -769,4 +771,23 @@ function cancelReceipt(fileId) {
   if (!fileId) return { ok: true };
   try { DriveApp.getFileById(String(fileId)).setTrashed(true); } catch (e) { console.warn(e); }
   return { ok: true };
+}
+
+
+/** 固定費・予算を更新（数式セルは変更不可） */
+function setFixedCost(data) {
+  if (!data || !data.sheetName || !data.row) throw new Error('更新対象が不正です。');
+  const ss = getHouseholdSpreadsheet_();
+  const sheet = ss.getSheetByName(String(data.sheetName));
+  if (!sheet) throw new Error('月タブ「' + data.sheetName + '」が見つかりません。');
+  const row = Number(data.row);
+  if (!Number.isFinite(row) || row < 2 || row > 12) throw new Error('行番号が不正です。');
+  const cell = sheet.getRange(row, 2);
+  if (cell.getFormula()) throw new Error('このセルは数式なので変更できません。');
+  const amount = Number(String(data.amount || '').replace(/,/g, ''));
+  if (!Number.isFinite(amount) || amount < 0) throw new Error('金額を確認してください。');
+  cell.setValue(amount);
+  SpreadsheetApp.flush();
+  cacheClearMonth_(String(data.sheetName));
+  return { ok: true, message: '更新しました。' };
 }

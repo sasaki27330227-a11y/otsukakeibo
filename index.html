@@ -137,7 +137,7 @@
         <div class="kpi">
           <div class="big"><div class="k">Savings — 貯金に回せる額</div><div id="kLeftover" class="v"></div></div>
           <div><div class="k">翔平 受け取り</div><div id="kReceive" class="v"></div></div>
-          <div><div class="k">予算</div><div id="kBudget" class="v"></div></div>
+          <div><div class="k">予算</div><div id="kBudget" class="v"></div><button type="button" class="del" style="color:var(--navy);border-color:var(--navy);margin:6px 0 0" onclick="editBudget()">変更</button></div>
           <div><div class="k">ゆみこ 支出合計</div><div id="kYumiko" class="v"></div></div>
           <div><div class="k">翔平 支出合計</div><div id="kShohei" class="v"></div></div>
           <div class="big" style="background:#fff"><div class="k">Balance — 差額</div><div id="kDiff" class="v"></div><div id="kDiffNote" class="tiny"></div></div>
@@ -365,13 +365,42 @@
     } catch (e) { status.textContent = errMsg(e); }
   }
 
+  async function editBudget() {
+    if (!currentMonth) return;
+    const cur = $('kBudget').textContent.replace(/[^\d]/g, '');
+    const v = prompt('今月の予算（円）', cur);
+    if (v === null) return;
+    const status = $('viewStatus'); status.textContent = '予算を更新中…';
+    try {
+      await api('setFixed', { sheetName: currentMonth, row: 2, amount: v });
+      try { localStorage.removeItem('tsuketsukeDash'); } catch (e) {}
+      await loadSummary(currentMonth);
+      status.textContent = '予算を更新しました。';
+    } catch (e) { status.textContent = errMsg(e); }
+  }
+
+  async function setFixed(row, label) {
+    if (!currentMonth) return;
+    const v = $('fx' + row).value;
+    const status = $('viewStatus'); status.textContent = label + ' を更新中…';
+    try {
+      await api('setFixed', { sheetName: currentMonth, row: row, amount: v });
+      try { localStorage.removeItem('tsuketsukeDash'); } catch (e) {}
+      await loadSummary(currentMonth);
+      status.textContent = label + ' を更新しました。';
+    } catch (e) { status.textContent = errMsg(e); }
+  }
+
   function renderSummary(d) {
     $('summary').classList.remove('hidden');
     setMoney('kLeftover', d.leftover); setMoney('kReceive', d.shoheiReceive); setMoney('kBudget', d.budget);
     setMoney('kYumiko', d.yumikoTotal); setMoney('kShohei', d.shoheiTotal); setMoney('kDiff', d.diff);
     $('kDiffNote').textContent = d.diff > 0 ? '翔平が ' + yen(d.diff) + ' 多く払っている' : d.diff < 0 ? 'ゆみこが ' + yen(-d.diff) + ' 多く払っている' : '同額';
     $('savings').textContent = d.savings ? '余り金の累計残高：' + yen(d.savings.balance) + '（' + d.savings.year + '年' + d.savings.month + '時点）' : '';
-    $('fixedTable').innerHTML = (d.fixed || []).map(f => '<tr><td>' + escapeHtml(f.label) + '</td><td class="r">' + yen(f.amount) + '</td></tr>').join('');
+    $('fixedTable').innerHTML = (d.fixed || []).map(f => f.editable
+      ? '<tr><td style="vertical-align:middle">' + escapeHtml(f.label) + '</td><td class="r"><input type="number" inputmode="numeric" value="' + f.amount + '" id="fx' + f.row + '" style="width:110px;display:inline-block;min-height:36px;padding:6px 8px;font-size:15px;text-align:right">' +
+        '<button type="button" class="del" style="color:var(--navy);border-color:var(--navy)" onclick="setFixed(' + f.row + ',\'' + escapeHtml(f.label).replace(/'/g, '&#39;') + '\')">保存</button></td></tr>'
+      : '<tr><td>' + escapeHtml(f.label) + '</td><td class="r">' + yen(f.amount) + ' <span class="stale">(自動)</span></td></tr>').join('');
     $('fixedCard').classList.toggle('hidden', !(d.fixed && d.fixed.length));
     $('entriesTable').innerHTML = (d.entries && d.entries.length)
       ? d.entries.map(e => '<tr><td><span class="tag ' + (e.payer === '翔平' ? 's' : 'y') + '">' + escapeHtml(e.payer) + '</span>' + escapeHtml(e.date) + '</td><td>' + escapeHtml(e.description || '') + '</td><td class="r">' + yen(e.amount) +
