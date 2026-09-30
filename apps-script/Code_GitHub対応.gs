@@ -33,16 +33,62 @@ function showReceiptAppUrl() {
   const url = ScriptApp.getService().getUrl();
   SpreadsheetApp.getUi().alert(
     'レシート登録ページ',
-    url || 'まだウェブアプリとしてデプロイされていません。',
+    (url ? url + '\n\nこのURLを GitHub Pages 側の設定に貼ります。' : 'まだウェブアプリとしてデプロイされていません。'),
     SpreadsheetApp.getUi().ButtonSet.OK
   );
 }
 
-function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
-    .setTitle('レシート登録')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+/* =========================================================
+ * Web API（GitHub Pages の画面から fetch で呼ばれる）
+ * ========================================================= */
+function doGet(e) {
+  const action = e && e.parameter && e.parameter.action;
+  if (!action) return jsonOut_({ ok: true, message: 'TsukeTsuke API' });
+  return handle_(action, e.parameter);
+}
+
+function doPost(e) {
+  let body = {};
+  try { body = JSON.parse((e && e.postData && e.postData.contents) || '{}'); } catch (err) {}
+  return handle_(body.action, body);
+}
+
+function handle_(action, p) {
+  try {
+    let data;
+    switch (String(action || '')) {
+      case 'dashboard': data = getDashboard(p.sheetName); break;
+      case 'summary':   data = getMonthSummary(p.sheetName); break;
+      case 'analyze':   data = analyzeReceipt(p); break;
+      case 'save':      data = saveReceipt(p); break;
+      case 'delete':    data = deleteEntry(p); break;
+      case 'cancel':    data = cancelReceipt(p.fileId); break;
+      default: throw new Error('不明なアクション: ' + action);
+    }
+    return jsonOut_({ ok: true, data: data });
+  } catch (err) {
+    console.error(err);
+    return jsonOut_({ ok: false, error: (err && err.message) || String(err) });
+  }
+}
+
+function jsonOut_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/* ---------- キャッシュ（お金の動きを速く） ---------- */
+function cacheGet_(key) {
+  try { const v = CacheService.getScriptCache().get(key); return v ? JSON.parse(v) : null; } catch (e) { return null; }
+}
+function cachePut_(key, obj, sec) {
+  try { CacheService.getScriptCache().put(key, JSON.stringify(obj), sec || 600); } catch (e) {}
+}
+function cacheClearMonth_(sheetName) {
+  try {
+    const c = CacheService.getScriptCache();
+    c.remove('summary:' + sheetName);
+    c.remove('sheets');
+  } catch (e) {}
 }
 
 /**
@@ -134,6 +180,7 @@ function saveReceipt(data) {
   }
 
   SpreadsheetApp.flush();
+  cacheClearMonth_(sheetName);
 
   return {
     ok: true,
@@ -456,6 +503,8 @@ function extractStoreName_(lines) {
 
 /** 月タブ一覧（新しい順）と、初期表示する月を返す */
 function listMonthSheets() {
+  const cached = cacheGet_('sheets');
+  if (cached) return cached;
   const ss = getHouseholdSpreadsheet_();
   const all = ss.getSheets().map(s => s.getName());
   const names = all.filter(n => monthKey_(n) > 0).sort((a, b) => monthKey_(b) - monthKey_(a));
@@ -463,7 +512,9 @@ function listMonthSheets() {
     throw new Error('月タブが見つかりません。タブ名: ' + all.join(', '));
   }
   const today = getMonthSheetName_(new Date());
-  return { sheets: names, current: names.indexOf(today) >= 0 ? today : names[0] };
+  const out = { sheets: names, current: names.indexOf(today) >= 0 ? today : names[0] };
+  cachePut_('sheets', out, 600);
+  return out;
 }
 
 /**
@@ -488,6 +539,8 @@ function getDashboard(sheetName) {
 
 /** 指定月タブのサマリーを返す */
 function getMonthSummary(sheetName) {
+  const cached = cacheGet_('summary:' + sheetName);
+  if (cached) return cached;
   const ss = getHouseholdSpreadsheet_();
   const sheet = ss.getSheetByName(String(sheetName));
   if (!sheet) throw new Error('月タブ「' + sheetName + '」が見つかりません。');
@@ -540,7 +593,7 @@ function getMonthSummary(sheetName) {
   pushEntry('翔平', 7, 8, 9);
   entries.sort((a, b) => b.sortKey - a.sortKey);
 
-  return {
+  const out = {
     sheetName: String(sheetName),
     budget: budget,
     fixed: fixed,
@@ -550,8 +603,11 @@ function getMonthSummary(sheetName) {
     shoheiTotal: shoheiTotal,
     diff: diff,                  // +なら翔平が多く払っている
     entries: entries,
-    savings: getSavingsBalance_(ss)
+    savings: getSavingsBalance_(ss),
+    fetchedAt: new Date().toISOString()
   };
+  cachePut_('summary:' + sheetName, out, 600);
+  return out;
 }
 
 /** 「余り金」タブの累計残金（最新月）を返す */
@@ -607,6 +663,7 @@ function getOrCreateMonthSheet_(ss, dateString) {
 
   clearMonthEntries_(sheet);
   try { linkSavingsTab_(ss, sheet.getName(), year, month); } catch (e) { console.warn(e); }
+  cacheClearMonth_(newName);
 
   return { sheet: sheet, isNew: true };
 }
@@ -702,6 +759,7 @@ function deleteEntry(data) {
 
   sheet.getRange(row, map.dateCol, 1, 3).clearContent().clearNote();
   SpreadsheetApp.flush();
+  cacheClearMonth_(String(data.sheetName));
   return { ok: true, message: '削除しました。' };
 }
 

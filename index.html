@@ -11,175 +11,389 @@
   <link rel="apple-touch-icon" href="./icon-192.png" />
   <title>TsukeTsuke — 大津家家計簿</title>
   <style>
-    :root{
-      color-scheme: light;
-      --bg:#F2EFE8; --panel:#FAF8F3; --ink:#232A3D; --muted:#7A7F8C;
-      --line:#232A3D; --accent:#232A3D; --danger:#9A4A3A;
-    }
-    *{box-sizing:border-box}
-    html,body{margin:0;height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink)}
-    body{min-height:100dvh;overflow:hidden}
-    .app{height:100dvh;display:flex;flex-direction:column}
-    header{
-      flex:0 0 auto;
-      padding:calc(10px + env(safe-area-inset-top)) 14px 10px;
-      display:flex;align-items:center;justify-content:space-between;gap:10px;
-      background:#F2EFE8;border-bottom:3px solid var(--line);
-      backdrop-filter:blur(12px)
-    }
-    .brand{display:flex;align-items:center;gap:10px;min-width:0}
-    .mark{
-      width:38px;height:38px;border-radius:12px;background:#111;color:#fff;
-      display:grid;place-items:center;font-size:20px;flex:none
-    }
-    .brand h1{font-size:17px;line-height:1.2;margin:0;color:var(--ink);letter-spacing:.04em;font-weight:900;white-space:nowrap}
-    .brand p{font-size:10px;color:var(--muted);margin:0 0 2px;letter-spacing:.14em;font-weight:800}
-    .settings{
-      border:2px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;
-      padding:8px 12px;font-size:13px;font-weight:900;letter-spacing:.06em
-    }
-    #frameWrap{flex:1;min-height:0;position:relative;overflow:auto;-webkit-overflow-scrolling:touch}
-    iframe{width:100%;height:100%;border:0;background:#F2EFE8;display:block}
-    .setup{
-      position:absolute;inset:0;display:grid;place-items:center;padding:20px;
-      background:var(--bg);overflow:auto
-    }
-    .card{
-      width:min(100%,520px);background:var(--panel);border:1px solid var(--line);
-      border-radius:20px;padding:20px;box-shadow:0 12px 38px rgba(0,0,0,.06)
-    }
-    .card h2{font-size:22px;margin:0 0 7px}
-    .card p{font-size:14px;line-height:1.65;color:#525252;margin:0 0 18px}
-    label{display:block;font-size:12px;font-weight:800;color:#525252;margin:0 0 8px}
-    input{
-      width:100%;font-size:16px;border:1px solid var(--line);border-radius:12px;
-      padding:13px 12px;background:#fff
-    }
-    .row{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
-    button.primary{
-      width:100%;border:0;border-radius:13px;padding:14px 16px;
-      background:var(--accent);color:#fff;font-size:16px;font-weight:800
-    }
-    button.link{
-      width:100%;border:1px solid var(--line);border-radius:13px;padding:12px 16px;
-      background:#fff;color:var(--ink);font-size:14px;font-weight:700
-    }
-    .error{color:var(--danger);font-size:13px;line-height:1.5;margin-top:10px;min-height:1.5em}
-    .hint{font-size:12px!important;color:var(--muted)!important;margin-top:10px!important}
-    .hidden{display:none!important}
+    :root { color-scheme: light; --bg:#F2EFE8; --card:#FAF8F3; --ink:#232A3D; --navy:#232A3D; --red:#9A4A3A; --yellow:#E3D9C2; --muted:#7A7F8C; --line:#232A3D; }
+    * { box-sizing:border-box; }
+    html, body { margin:0; background:var(--bg); color:#1f2340; font-family:"Helvetica Neue",Helvetica,Arial,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif; }
+    body { background-image:radial-gradient(rgba(35,42,61,.05) 1px, transparent 1px); background-size:14px 14px; padding-bottom:env(safe-area-inset-bottom); }
+    header { position:sticky; top:0; z-index:5; padding:calc(10px + env(safe-area-inset-top)) 14px 10px; display:flex; align-items:center; justify-content:space-between; gap:10px; background:#F2EFE8; border-bottom:3px solid var(--line); }
+    .brand p { font-size:10px; color:var(--muted); margin:0 0 2px; letter-spacing:.14em; font-weight:800; }
+    .brand h1 { font-size:17px; line-height:1.2; margin:0; color:var(--ink); letter-spacing:.04em; font-weight:900; white-space:nowrap; }
+    .hbtn { border:2px solid var(--line); background:var(--card); color:var(--ink); border-radius:999px; padding:8px 12px; font-size:13px; font-weight:900; letter-spacing:.06em; width:auto; }
+    main { max-width:520px; margin:0 auto; padding:14px 16px 60px; }
+    .card { background:var(--card); border:2px solid var(--navy); border-radius:6px; padding:16px; margin:14px 0; box-shadow:3px 3px 0 var(--navy); }
+    .label { display:block; font-size:11px; font-weight:900; margin-bottom:8px; color:var(--navy); letter-spacing:.18em; text-transform:uppercase; }
+    .seg { display:grid; grid-template-columns:1fr 1fr; border:2px solid var(--navy); border-radius:999px; overflow:hidden; }
+    .seg input { display:none; }
+    .seg label { text-align:center; padding:12px 10px; font-weight:900; background:var(--card); color:var(--navy); letter-spacing:.1em; }
+    .seg label + input + label { border-left:2px solid var(--navy); }
+    .seg input:checked + label { background:var(--navy); color:#F2EFE8; }
+    input[type="file"], input[type="date"], input[type="number"], input[type="text"], input[type="url"] { width:100%; min-width:0; max-width:100%; display:block; -webkit-appearance:none; appearance:none; min-height:48px; border:2px solid var(--navy); border-radius:6px; padding:12px; background:#fff; font-size:16px; color:#1f2340; }
+    input:focus { outline:none; box-shadow:0 0 0 3px var(--yellow); }
+    button { width:100%; border:2px solid var(--navy); border-radius:999px; padding:14px; font-size:15px; font-weight:900; letter-spacing:.12em; background:var(--navy); color:#F2EFE8; cursor:pointer; font-family:inherit; }
+    button.secondary { background:var(--card); color:var(--navy); }
+    button:disabled { opacity:.45; cursor:default; }
+    .field { margin:12px 0; }
+    .status { font-size:13px; line-height:1.55; margin-top:12px; color:var(--muted); }
+    .warn { background:#F1EAD8; border:2px solid var(--yellow); color:#6A5A3A; padding:10px 12px; border-radius:6px; font-size:13px; margin-top:10px; }
+    .ok { background:var(--navy); color:#F2EFE8; padding:12px; border-radius:6px; font-size:14px; margin-top:10px; font-weight:800; white-space:pre-line; }
+    .tiny { font-size:12px; color:var(--muted); margin-top:8px; }
+    .tabs { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:6px; }
+    .tabs button { background:var(--card); color:var(--navy); padding:12px; border-radius:6px; box-shadow:3px 3px 0 var(--navy); }
+    .tabs button.active { background:var(--navy); color:#F2EFE8; }
+    select { width:100%; border:2px solid var(--navy); border-radius:6px; padding:12px; background:#fff; font-size:16px; color:var(--navy); font-weight:800; font-family:inherit; }
+    .kpi { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+    .kpi div { background:#fff; border:2px solid var(--navy); border-radius:6px; padding:12px; }
+    .kpi .k { font-size:10px; color:var(--navy); letter-spacing:.14em; text-transform:uppercase; font-weight:900; }
+    .kpi .v { font-size:24px; font-weight:800; margin-top:4px; color:var(--navy); font-variant-numeric:tabular-nums; }
+    .kpi .v.minus { color:var(--red); }
+    .kpi .big { grid-column:1 / -1; background:var(--yellow); }
+    .kpi .big .v { font-size:32px; }
+    table { width:100%; border-collapse:collapse; font-size:14px; margin-top:8px; }
+    td { padding:9px 4px; border-bottom:1px dashed rgba(35,42,61,.3); vertical-align:top; }
+    td.r { text-align:right; white-space:nowrap; font-weight:800; color:var(--navy); font-variant-numeric:tabular-nums; }
+    .tag { display:inline-block; font-size:10px; padding:2px 8px; border-radius:999px; border:1.5px solid var(--navy); color:var(--navy); margin-right:6px; font-weight:900; letter-spacing:.08em; }
+    .tag.s { background:var(--navy); color:#F2EFE8; }
+    .tag.y { background:var(--red); border-color:var(--red); color:#F2EFE8; }
+    button.del { width:auto; padding:4px 10px; font-size:11px; letter-spacing:.05em; background:#fff; color:var(--red); border:1.5px solid var(--red); border-radius:999px; margin-left:6px; }
+    details pre { white-space:pre-wrap; font-size:12px; color:#525252; background:#fafafa; border:1px solid var(--line); border-radius:6px; padding:10px; max-height:220px; overflow:auto; }
+    .stale { font-size:11px; color:var(--muted); }
+    .modal { position:fixed; inset:0; background:rgba(35,42,61,.45); display:grid; place-items:center; padding:20px; z-index:10; }
+    .modal .card { width:100%; max-width:420px; margin:0; }
+    .hidden { display:none !important; }
+    .skeleton { height:14px; background:rgba(35,42,61,.1); border-radius:4px; margin:8px 0; }
   </style>
 </head>
 <body>
-<div class="app">
-  <header>
-    <div class="brand">
-      <div>
-        <p>大津家家計簿</p>
-        <h1>TsukeTsuke</h1>
+<header>
+  <div class="brand">
+    <p>大津家家計簿</p>
+    <h1>TsukeTsuke</h1>
+  </div>
+  <div style="display:flex;gap:6px;flex:0 0 auto">
+    <button class="hbtn" type="button" id="reloadBtn">↻ 更新</button>
+    <button class="hbtn" type="button" id="settingsBtn">設定</button>
+  </div>
+</header>
+
+<main>
+  <div class="tabs">
+    <button id="tabReg" type="button" class="active" onclick="showTab('reg')">登録</button>
+    <button id="tabView" type="button" onclick="showTab('view')">お金の動き</button>
+  </div>
+
+  <!-- ===== 登録 ===== -->
+  <div id="regPane">
+    <form id="receiptForm" class="card" onsubmit="analyze(); return false;">
+      <span class="label">Who paid — 誰が払った？</span>
+      <div class="seg">
+        <input id="payerY" type="radio" name="payer" value="ゆみこ" checked>
+        <label for="payerY">ゆみこ</label>
+        <input id="payerS" type="radio" name="payer" value="翔平">
+        <label for="payerS">翔平</label>
       </div>
-    </div>
-    <div style="display:flex;gap:6px;flex:0 0 auto">
-      <button class="settings" type="button" id="reloadBtn" title="更新">↻ 更新</button>
-      <button class="settings" type="button" id="settingsBtn">設定</button>
-    </div>
-  </header>
+      <div class="field">
+        <span class="label">Receipt — レシート</span>
+        <input id="receipt" type="file" accept="image/*">
+        <div class="tiny">タップすると「写真を撮る」か「フォトライブラリ」を選べます。</div>
+      </div>
+      <button id="readBtn" type="submit">レシートを読み取る</button>
+      <button type="button" class="secondary" style="margin-top:8px" onclick="manualEntry()">レシートなしで手入力</button>
+      <div id="readStatus" class="status"></div>
+    </form>
 
-  <div id="frameWrap">
-    <iframe id="gasFrame" class="hidden" title="レシート登録"></iframe>
-
-    <div id="setup" class="setup">
-      <div class="card">
-        <h2>最初の1回だけ設定</h2>
-        <p>
-          Google Apps Scriptをウェブアプリとしてデプロイしたときの
-          <strong>/exec</strong> で終わるURLを貼ってください。
-          URLはこのスマホ内にだけ保存され、GitHubには保存されません。
-        </p>
-
-        <label for="gasUrl">Apps Script URL</label>
-        <input
-          id="gasUrl"
-          type="url"
-          inputmode="url"
-          autocomplete="off"
-          placeholder="https://script.google.com/macros/s/...../exec"
-        />
-
-        <div class="row">
-          <button class="primary" type="button" id="saveBtn">保存して家計簿を開く</button>
-          <button class="link hidden" type="button" id="cancelBtn">キャンセル</button>
+    <section id="resultCard" class="card hidden">
+      <span class="label">Check — 読み取り結果</span>
+      <div class="field">
+        <span class="label">誰が払った？</span>
+        <div class="seg">
+          <input id="resPayerY" type="radio" name="resPayer" value="ゆみこ" checked>
+          <label for="resPayerY">ゆみこ</label>
+          <input id="resPayerS" type="radio" name="resPayer" value="翔平">
+          <label for="resPayerS">翔平</label>
         </div>
-
-        <div id="error" class="error"></div>
-        <p class="hint">
-          スプレッドシート自体は今まで通り直接開いて手入力できます。
-          この画面は「レシート入力」を追加するだけです。
-        </p>
       </div>
-    </div>
+      <div class="field"><span class="label">日付</span><input id="date" type="date"></div>
+      <div class="field"><span class="label">合計金額</span><input id="amount" type="number" min="1" inputmode="numeric"></div>
+      <div class="field"><span class="label">店名・内容</span><input id="description" type="text" placeholder="例：ヨーカドー"></div>
+      <div id="warning" class="warn hidden"></div>
+      <div id="target" class="tiny"></div>
+      <details id="ocrBox" class="hidden" style="margin-top:8px">
+        <summary class="tiny" style="cursor:pointer">読み取った文字を見る</summary>
+        <pre id="ocrText"></pre>
+      </details>
+      <button id="saveBtn" type="button" onclick="save()">家計簿に登録</button>
+      <button type="button" class="secondary" style="margin-top:8px" onclick="cancelEntry()">やめる</button>
+      <div id="saveStatus" class="status"></div>
+    </section>
+  </div>
+
+  <!-- ===== お金の動き ===== -->
+  <div id="viewPane" class="hidden">
+    <section class="card">
+      <span class="label">Month — 月を選ぶ</span>
+      <select id="monthSelect" onchange="loadSummary(this.value)"></select>
+      <div id="viewStatus" class="status"></div>
+      <div id="summary" class="hidden">
+        <div class="kpi">
+          <div class="big"><div class="k">Savings — 貯金に回せる額</div><div id="kLeftover" class="v"></div></div>
+          <div><div class="k">翔平 受け取り</div><div id="kReceive" class="v"></div></div>
+          <div><div class="k">予算</div><div id="kBudget" class="v"></div></div>
+          <div><div class="k">ゆみこ 支出合計</div><div id="kYumiko" class="v"></div></div>
+          <div><div class="k">翔平 支出合計</div><div id="kShohei" class="v"></div></div>
+          <div class="big" style="background:#fff"><div class="k">Balance — 差額</div><div id="kDiff" class="v"></div><div id="kDiffNote" class="tiny"></div></div>
+        </div>
+        <div id="savings" class="tiny"></div>
+        <div id="stale" class="stale"></div>
+      </div>
+    </section>
+    <section id="fixedCard" class="card hidden">
+      <span class="label">Fixed — 固定費</span>
+      <table id="fixedTable"></table>
+    </section>
+    <section id="entriesCard" class="card hidden">
+      <span class="label">Entries — 明細（新しい順）</span>
+      <table id="entriesTable"></table>
+    </section>
+  </div>
+</main>
+
+<!-- ===== 設定 ===== -->
+<div id="setup" class="modal hidden">
+  <div class="card">
+    <span class="label">Settings — Apps Script URL</span>
+    <input id="gasUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec">
+    <div class="tiny">スプシの「📸 レシート → 登録ページURLを表示」で出るURL。通常は変更不要。</div>
+    <button type="button" id="saveUrlBtn" style="margin-top:12px">保存</button>
+    <button type="button" id="cancelUrlBtn" class="secondary" style="margin-top:8px">閉じる</button>
+    <div id="setupError" class="status"></div>
   </div>
 </div>
 
 <script>
-  const KEY = 'receiptKakeiboGasUrl';
+  /* ---------- 設定 ---------- */
+  const KEY = 'tsuketsukeGasUrl';
   const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyJQWcYmwG0wKCPN_ij5Onjf0DH222nyz4mEXaOpHPisOidKjIYbAMKrHhpOQU2Ojci/exec';
+  function isValidGasUrl(v) { return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec\/?$/.test(String(v || '').trim()); }
+  function gasUrl() { let v = null; try { v = localStorage.getItem(KEY); } catch (e) {} return isValidGasUrl(v) ? v.trim() : DEFAULT_GAS_URL; }
+
   const setup = document.getElementById('setup');
-  const frame = document.getElementById('gasFrame');
-  const urlInput = document.getElementById('gasUrl');
-  const errorBox = document.getElementById('error');
-  const cancelBtn = document.getElementById('cancelBtn');
-
-  function isValidGasUrl(value) {
-    try {
-      const u = new URL(value);
-      return u.protocol === 'https:' &&
-             u.hostname === 'script.google.com' &&
-             /^\/macros\/s\/[^/]+\/exec$/.test(u.pathname);
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function currentUrl() {
-    const v = localStorage.getItem(KEY);
-    return v && isValidGasUrl(v) ? v : DEFAULT_GAS_URL;
-  }
-
-  function openApp(url) {
-    frame.src = url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now();
-    frame.classList.remove('hidden');
+  document.getElementById('settingsBtn').onclick = () => { document.getElementById('gasUrl').value = gasUrl(); document.getElementById('setupError').textContent = ''; setup.classList.remove('hidden'); };
+  document.getElementById('cancelUrlBtn').onclick = () => setup.classList.add('hidden');
+  document.getElementById('saveUrlBtn').onclick = () => {
+    const v = document.getElementById('gasUrl').value.trim();
+    if (!isValidGasUrl(v)) { document.getElementById('setupError').textContent = 'URLの形式が違います（/exec で終わるURL）'; return; }
+    try { localStorage.setItem(KEY, v); } catch (e) {}
     setup.classList.add('hidden');
+    monthsLoaded = false;
+  };
+  document.getElementById('reloadBtn').onclick = () => {
+    if (!document.getElementById('viewPane').classList.contains('hidden')) { monthsLoaded = false; loadMonths(true); }
+    else location.reload();
+  };
+
+  /* ---------- API ---------- */
+  async function api(action, payload) {
+    const res = await fetch(gasUrl(), { method: 'POST', body: JSON.stringify(Object.assign({ action: action }, payload || {})) });
+    const text = await res.text();
+    let j;
+    try { j = JSON.parse(text); } catch (e) { throw new Error('サーバーの応答が不正です。Apps Scriptのデプロイを確認してください。'); }
+    if (!j.ok) throw new Error(j.error || 'エラー');
+    return j.data;
+  }
+  function errMsg(e) { return 'エラー：' + (e && e.message ? e.message : e); }
+
+  /* ---------- タブ ---------- */
+  function showTab(name) {
+    document.getElementById('regPane').classList.toggle('hidden', name !== 'reg');
+    document.getElementById('viewPane').classList.toggle('hidden', name !== 'view');
+    document.getElementById('tabReg').classList.toggle('active', name === 'reg');
+    document.getElementById('tabView').classList.toggle('active', name === 'view');
+    try { localStorage.setItem('tsuketsukeTab', name); } catch (e) {}
+    if (name === 'view' && !monthsLoaded) loadMonths(false);
   }
 
-  function showSetup(canCancel = false) {
-    const current = currentUrl();
-    urlInput.value = current;
-    errorBox.textContent = '';
-    setup.classList.remove('hidden');
-    cancelBtn.classList.toggle('hidden', !canCancel);
+  /* ---------- 登録 ---------- */
+  let current = null, hideTimer = null;
+  function $(id) { return document.getElementById(id); }
+  function setResPayer(p) { $(p === '翔平' ? 'resPayerS' : 'resPayerY').checked = true; }
+  function getResPayer() { return document.querySelector('input[name="resPayer"]:checked').value; }
+  function getFormPayer() { return document.querySelector('input[name="payer"]:checked').value; }
+
+  function clearResult() {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    current = null;
+    ['date','amount','description'].forEach(id => $(id).value = '');
+    $('target').textContent = ''; $('saveStatus').textContent = '';
+    $('warning').classList.add('hidden'); $('ocrBox').classList.add('hidden');
+    $('saveBtn').disabled = false; $('resultCard').classList.add('hidden');
+  }
+  function todayIso() { const t = new Date(); return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); }
+
+  function manualEntry() {
+    clearResult();
+    const payer = getFormPayer();
+    current = { payer: payer, receiptFileId: '', receiptUrl: '' };
+    setResPayer(payer);
+    $('date').value = todayIso();
+    $('target').textContent = '手入力（日付の月のタブに登録されます）';
+    $('readStatus').textContent = '';
+    $('resultCard').classList.remove('hidden');
+    setTimeout(() => $('amount').focus(), 100);
   }
 
-  document.getElementById('saveBtn').addEventListener('click', () => {
-    const value = urlInput.value.trim();
-    if (!isValidGasUrl(value)) {
-      errorBox.textContent = 'URLを確認してください。Apps Scriptの「ウェブアプリURL（/exec）」を貼ります。';
-      return;
-    }
-    localStorage.setItem(KEY, value);
-    openApp(value);
-  });
+  function cancelEntry() {
+    const fileId = current && current.receiptFileId;
+    clearResult();
+    $('receiptForm').reset(); $('payerY').checked = true; $('readStatus').textContent = '';
+    if (fileId) api('cancel', { fileId: fileId }).catch(() => {});
+    $('receiptForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
-  document.getElementById('settingsBtn').addEventListener('click', () => showSetup(true));
-  cancelBtn.addEventListener('click', () => openApp(currentUrl()));
-  document.getElementById('reloadBtn').addEventListener('click', () => openApp(currentUrl()));
-
-  openApp(currentUrl());
-
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+  function shrinkImage(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const MAX = 1600;
+          let w = img.naturalWidth, h = img.naturalHeight;
+          const scale = Math.min(1, MAX / Math.max(w, h));
+          w = Math.round(w * scale); h = Math.round(h * scale);
+          const c = document.createElement('canvas'); c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
+          const dataUrl = c.toDataURL('image/jpeg', 0.8);
+          URL.revokeObjectURL(url);
+          resolve(dataUrl.split(',')[1]);
+        } catch (e) { reject(e); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('画像を読み込めませんでした。')); };
+      img.src = url;
     });
   }
+
+  async function analyze() {
+    const btn = $('readBtn'), status = $('readStatus');
+    const file = $('receipt').files[0];
+    if (!file) { status.textContent = 'レシート画像を選択してください。'; return; }
+    const payer = getFormPayer();
+    btn.disabled = true; clearResult();
+    try {
+      status.textContent = '画像を準備中…';
+      const imageBase64 = await shrinkImage(file);
+      status.textContent = '読み取り中…';
+      const data = await api('analyze', { payer: payer, imageBase64: imageBase64, mimeType: 'image/jpeg' });
+      current = data;
+      setResPayer(data.payer);
+      $('date').value = data.date || ''; $('amount').value = data.amount || ''; $('description').value = data.description || '';
+      $('target').textContent = '登録先予定：' + data.detectedSheet + ' タブ';
+      $('ocrText').textContent = data.ocrText || '（読み取れませんでした）'; $('ocrBox').classList.remove('hidden');
+      const w = $('warning'); if (data.warning) { w.textContent = data.warning; w.classList.remove('hidden'); } else w.classList.add('hidden');
+      $('resultCard').classList.remove('hidden');
+      status.textContent = '読み取り完了。内容だけ確認してください。';
+      setTimeout(() => $('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    } catch (e) { status.textContent = errMsg(e); }
+    btn.disabled = false;
+  }
+
+  async function save() {
+    if (!current) return;
+    const btn = $('saveBtn'), status = $('saveStatus');
+    btn.disabled = true; status.textContent = '登録中…';
+    try {
+      const res = await api('save', { payer: getResPayer(), date: $('date').value, amount: $('amount').value, description: $('description').value, receiptFileId: current.receiptFileId, receiptUrl: current.receiptUrl });
+      status.innerHTML = '<div class="ok">' + escapeHtml(res.message) + '</div>';
+      $('receiptForm').reset(); $('payerY').checked = true; current = null;
+      monthsLoaded = false; try { localStorage.removeItem('tsuketsukeDash'); } catch (e) {}
+      hideTimer = setTimeout(() => { hideTimer = null; clearResult(); $('readStatus').textContent = ''; $('receiptForm').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 1500);
+    } catch (e) { status.textContent = errMsg(e); btn.disabled = false; }
+  }
+
+  /* ---------- 閲覧 ---------- */
+  let monthsLoaded = false, currentMonth = null;
+
+  function fillMonths(sheets, cur) {
+    const sel = $('monthSelect'); sel.innerHTML = '';
+    sheets.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = monthLabel(n); sel.appendChild(o); });
+    sel.value = cur; currentMonth = cur;
+  }
+
+  async function loadMonths(force) {
+    const status = $('viewStatus');
+    // 1) 前回の結果を即表示
+    let cached = null;
+    try { cached = JSON.parse(localStorage.getItem('tsuketsukeDash') || 'null'); } catch (e) {}
+    if (cached && cached.sheets && cached.summary) {
+      fillMonths(cached.sheets, cached.current);
+      renderSummary(cached.summary);
+      $('stale').textContent = '最新を取得中…';
+    } else {
+      status.textContent = '読み込み中…';
+    }
+    // 2) 裏で最新を取る
+    try {
+      const res = await api('dashboard', { sheetName: currentMonth });
+      monthsLoaded = true;
+      fillMonths(res.sheets, res.current);
+      renderSummary(res.summary);
+      status.textContent = ''; $('stale').textContent = '';
+      try { localStorage.setItem('tsuketsukeDash', JSON.stringify(res)); } catch (e) {}
+    } catch (e) {
+      status.textContent = errMsg(e);
+      $('stale').textContent = cached ? '（前回取得した内容を表示中）' : '';
+    }
+  }
+
+  async function loadSummary(name) {
+    currentMonth = name;
+    const status = $('viewStatus'); status.textContent = '読み込み中…';
+    try {
+      const d = await api('summary', { sheetName: name });
+      status.textContent = ''; renderSummary(d);
+    } catch (e) { status.textContent = errMsg(e); }
+  }
+
+  async function deleteEntry(row, payer, amount, desc) {
+    if (!currentMonth) return;
+    if (!confirm('この明細を削除しますか？\n' + payer + ' / ' + desc + ' / ' + yen(amount))) return;
+    const status = $('viewStatus'); status.textContent = '削除中…';
+    try {
+      const res = await api('delete', { sheetName: currentMonth, payer: payer, row: row, amount: amount });
+      status.textContent = res.message || '削除しました。';
+      try { localStorage.removeItem('tsuketsukeDash'); } catch (e) {}
+      loadSummary(currentMonth);
+    } catch (e) { status.textContent = errMsg(e); }
+  }
+
+  function renderSummary(d) {
+    $('summary').classList.remove('hidden');
+    setMoney('kLeftover', d.leftover); setMoney('kReceive', d.shoheiReceive); setMoney('kBudget', d.budget);
+    setMoney('kYumiko', d.yumikoTotal); setMoney('kShohei', d.shoheiTotal); setMoney('kDiff', d.diff);
+    $('kDiffNote').textContent = d.diff > 0 ? '翔平が ' + yen(d.diff) + ' 多く払っている' : d.diff < 0 ? 'ゆみこが ' + yen(-d.diff) + ' 多く払っている' : '同額';
+    $('savings').textContent = d.savings ? '余り金の累計残高：' + yen(d.savings.balance) + '（' + d.savings.year + '年' + d.savings.month + '時点）' : '';
+    $('fixedTable').innerHTML = (d.fixed || []).map(f => '<tr><td>' + escapeHtml(f.label) + '</td><td class="r">' + yen(f.amount) + '</td></tr>').join('');
+    $('fixedCard').classList.toggle('hidden', !(d.fixed && d.fixed.length));
+    $('entriesTable').innerHTML = (d.entries && d.entries.length)
+      ? d.entries.map(e => '<tr><td><span class="tag ' + (e.payer === '翔平' ? 's' : 'y') + '">' + escapeHtml(e.payer) + '</span>' + escapeHtml(e.date) + '</td><td>' + escapeHtml(e.description || '') + '</td><td class="r">' + yen(e.amount) +
+          '<button type="button" class="del" onclick="deleteEntry(' + e.row + ',\'' + e.payer + '\',' + e.amount + ',\'' + escapeHtml(e.description || '').replace(/'/g, '&#39;') + '\')">削除</button></td></tr>').join('')
+      : '<tr><td>まだ登録がありません</td></tr>';
+    $('entriesCard').classList.remove('hidden');
+  }
+
+  function setMoney(id, v) { const el = $(id); el.textContent = v === null || v === undefined ? '—' : yen(v); el.classList.toggle('minus', typeof v === 'number' && v < 0); }
+  function yen(v) { return '¥' + Math.round(Number(v) || 0).toLocaleString('ja-JP'); }
+  function monthLabel(n) {
+    const m = String(n).normalize('NFKC').match(/^(20)?(\d{2})\s*[\/\.\-_年]?\s*(\d{1,2})\s*月?$/);
+    return m ? '20' + m[2] + '年' + Number(m[3]) + '月' : n;
+  }
+  function escapeHtml(s) { return String(s).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+
+  /* ---------- 起動 ---------- */
+  (function init() {
+    let tab = 'reg'; try { tab = localStorage.getItem('tsuketsukeTab') || 'reg'; } catch (e) {}
+    showTab(tab);
+    if (tab !== 'view') { setTimeout(() => loadMonths(false), 300); } // 裏で先読み
+    if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {})); }
+  })();
 </script>
 </body>
 </html>

@@ -1,38 +1,16 @@
-# 家計簿レシート登録（GitHub Pages版）
+# TsukeTsuke — 大津家家計簿（GitHub Pages + Apps Script API）
 
-## GitHubへアップするファイル
-リポジトリ直下へ以下をアップロードします。
+## 構成
+- `index.html` … 画面（GitHub Pages）。Apps Script を JSON API として fetch で呼ぶ
+- `apps-script/Code_GitHub対応.gs` … Apps Script（家計簿スプシに紐づけ）。API・OCR・書き込み・キャッシュ
 
-- `index.html`
-- `manifest.webmanifest`
-- `sw.js`
-- `icon-192.png`
-- `icon-512.png`
-
-`apps-script/` フォルダはGoogle Apps Script用なので、GitHub Pagesでは実行されません。
-
-## GitHub PagesをONにする
-GitHub → リポジトリ → Settings → Pages
-
-- Source: `Deploy from a branch`
-- Branch: `main`
-- Folder: `/ (root)`
-
-保存後に表示されたURLをスマホで開きます。
-
-## Apps Script側
+## Apps Script 側（更新時）
 1. 家計簿スプレッドシート → 拡張機能 → Apps Script
-2. `apps-script/Code_GitHub対応.gs` を `Code.gs` に貼る
-3. `apps-script/Index.html` をHTMLファイル `Index` に貼る
-4. Apps Script → サービス → Google Drive API を追加
-5. スプレッドシートを再読込 → `📸 レシート` → `初期設定`
-6. Apps Script → デプロイ → 新しいデプロイ → ウェブアプリ
-7. 発行された `/exec` URL をGitHub Pagesの初回設定画面に貼る
+2. `apps-script/Code_GitHub対応.gs` の中身を `コード.gs` に丸ごと貼り替え → 保存
+3. `Index.html` は不要（あれば削除してOK）
+4. デプロイ → デプロイを管理 → 鉛筆 → 「新バージョン」→ デプロイ（URLは変わらない）
 
-### 重要
-GitHub Pages内にApps Script画面を表示するため、`doGet()` に
-`setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)` を入れています。
+初回のみ：サービスに Drive API を追加 → スプシで「📸 レシート → 初期設定」→ ウェブアプリとしてデプロイ（実行ユーザー：自分 / アクセス：全員）→ `/exec` URL を `index.html` の `DEFAULT_GAS_URL` に設定。
 
-## 既存のスプレッドシート入力
-今まで通り直接入力できます。
-この仕組みはレシート入力経路を追加するだけで、既存入力方法は変更しません。
+## GitHub Pages 側
+`index.html` `manifest.webmanifest` `sw.js` `icon-*.png` をリポジトリ直下に置き、Settings → Pages で main / root を公開。
